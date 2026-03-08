@@ -24,6 +24,31 @@ export const worshipUnits = pgTable("worship_units", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export interface LessonSectionData {
+  title: string;
+  content: string;
+  instructions: string[];
+  materials?: string[];
+}
+
+export interface LessonSections {
+  welcome: LessonSectionData | null;
+  bibleTime: LessonSectionData | null;
+  talkAndMemorize: LessonSectionData | null;
+  sing: LessonSectionData | null;
+  makeAndDo: LessonSectionData | null;
+  finalFocus: LessonSectionData | null;
+}
+
+export interface SidebarMeta {
+  bibleTruths: string;
+  scripture: string;
+  scriptureText: string;
+  lessonFocus: string;
+  goalsForChildren: string;
+  memoryMinute: string;
+}
+
 export const worshipLessons = pgTable("worship_lessons", {
   id: serial("id").primaryKey(),
   unitId: integer("unit_id").notNull().references(() => worshipUnits.id, { onDelete: "cascade" }),
@@ -38,4 +63,8 @@ export const worshipLessons = pgTable("worship_lessons", {
   prayerFocus: text("prayer_focus").default(""),
   songSuggestions: jsonb("song_suggestions").$type<string[] | null>(),
   preGeneratedQuiz: jsonb("pre_generated_quiz").$type<any[]>(),
+  lessonSections: jsonb("lesson_sections").$type<LessonSections | null>(),
+  sidebarMeta: jsonb("sidebar_meta").$type<SidebarMeta | null>(),
+  preparation: text("preparation").default(""),
+  bibleBackground: text("bible_background").default(""),
 });

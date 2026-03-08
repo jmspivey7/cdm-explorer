@@ -42,7 +42,7 @@ Three tables managed by Drizzle ORM (`shared/schema.ts`):
 
 - **sermons**: id (text PK), title, scripture, summary, key_themes (jsonb), status, raw_text, scenes (jsonb), progress, current_step, error, created_at
 - **worship_units**: id (serial PK), number, title, description, worship_element, created_at
-- **worship_lessons**: id (serial PK), unit_id (FK → worship_units.id), number, title, main_idea, memory_verse, memory_verse_reference, worship_sign, call_and_response (jsonb), activities (jsonb), prayer_focus, song_suggestions (jsonb), pre_generated_quiz (jsonb)
+- **worship_lessons**: id (serial PK), unit_id (FK → worship_units.id, cascade delete), number, title, main_idea, memory_verse, memory_verse_reference, worship_sign, call_and_response (jsonb), activities (jsonb), prayer_focus, song_suggestions (jsonb), pre_generated_quiz (jsonb), lesson_sections (jsonb — structured sections: welcome/bibleTime/talkAndMemorize/sing/makeAndDo/finalFocus), sidebar_meta (jsonb — bibleTruths/scripture/scriptureText/lessonFocus/goalsForChildren/memoryMinute), preparation (text), bible_background (text)
 
 Upload progress is kept in an in-memory Map (transient processing state only).
 
@@ -100,6 +100,14 @@ Upload progress is kept in an in-memory Map (transient processing state only).
 - `POST /api/worship/ai/teacher-assistant` - Generate teaching aids
 - `POST /api/worship/ai/generate-story` - Generate child-friendly worship story
 - `POST /api/worship/ai/parent-guide` - Generate parent guide for a lesson
+
+## Teacher Lesson Plan View
+
+The teacher view (`worship-teacher.tsx`) renders lesson plans in a two-column layout:
+- **Main content (left 2/3)**: Preparation, Bible Background, then six expandable lesson section cards (Welcome, Bible Time, Talk and Memorize, Sing, Make and Do, Final Focus) each with content, instructions, and materials
+- **Sidebar (right 1/3)**: Scripture, Lesson Focus, Bible Truths, Goals for Children, Memory Minute
+- Falls back gracefully for lessons uploaded before the structured format was added (shows flat mainIdea/activities/etc.)
+- AI extraction prompt is optimized for the "Exploring the Elements of Worship" curriculum format
 
 ## Image Generation (Gemini Native)
 

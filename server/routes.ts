@@ -264,6 +264,10 @@ export async function registerRoutes(server: Server, app: Express) {
           prayerFocus: l.prayerFocus,
           songSuggestions: l.songSuggestions,
           preGeneratedQuiz: l.preGeneratedQuiz,
+          lessonSections: l.lessonSections,
+          sidebarMeta: l.sidebarMeta,
+          preparation: l.preparation,
+          bibleBackground: l.bibleBackground,
         })),
       });
     } catch (err: any) {
@@ -1184,27 +1188,62 @@ Respond with JSON:
 
   const structure = JSON.parse(structureResponse.choices[0].message.content || '{}');
 
-  // Step 2: Extract detailed lesson data
+  // Step 2: Extract detailed lesson data with structured sections
   updateUploadProgress("Extracting lesson content...", 30);
   const lessonsResponse = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: `You are parsing a children's worship curriculum document. Extract ALL lesson data with maximum detail.
+        content: `You are parsing a children's worship curriculum document from the "Exploring the Elements of Worship" series. Extract ALL lesson data with maximum detail.
 
-For each lesson found, extract every available field:
-- title: The lesson title
-- mainIdea: The main teaching point (1-2 sentences summarizing the lesson focus)
-- memoryVerse: The exact memory verse text (look for "Memory Minute", "Memory Verse", or similar sections)
-- memoryVerseReference: The Bible verse reference (e.g., "Psalm 95:6", "Luke 17:11-19")
+This curriculum format has a consistent structure. For each lesson found, extract:
+
+BASIC FIELDS:
+- title: The lesson title (e.g., "Jesus Heals Ten Lepers")
+- mainIdea: The main teaching point (1-2 sentences)
+- memoryVerse: The exact memory verse text (look for "Memory Minute" section)
+- memoryVerseReference: The Bible verse reference (e.g., "Luke 17:11-19")
 - worshipSign: Any worship sign, hand motion, or physical gesture described
-- callAndResponse: If there are leader/response elements, extract as {leader: "...", response: "..."}. If none found, use null.
-- activities: Array of activity descriptions found in the lesson (crafts, games, songs, discussions)
-- prayerFocus: The prayer focus, closing prayer, or suggested prayer text
+- callAndResponse: If leader/response elements exist, extract as {leader: "...", response: "..."}. If none, use null.
+- prayerFocus: The prayer focus or closing prayer text
 - songSuggestions: Any song titles mentioned (array of strings). If none, use null.
 
-Be thorough - extract EVERYTHING available from the document for each lesson.
+SIDEBAR METADATA (look for sidebar panels, highlighted boxes, or header sections):
+- sidebarMeta: {
+    "bibleTruths": Summary of key Bible truths taught in this lesson,
+    "scripture": The scripture reference (e.g., "Luke 17:11-19"),
+    "scriptureText": The actual Bible passage text if included,
+    "lessonFocus": The lesson focus statement,
+    "goalsForChildren": What children should learn/take away,
+    "memoryMinute": The memory verse activity description or memory verse with instructions
+  }
+
+PREPARATION & BACKGROUND:
+- preparation: The teacher preparation instructions (what to gather, set up, read ahead of time)
+- bibleBackground: The Bible background or context section explaining the passage for the teacher
+
+SIX LESSON SECTIONS (extract each section with its content):
+- lessonSections: {
+    "welcome": Extract the Welcome section — greeting activities, opening questions, transition into lesson. Include step-by-step instructions and any materials needed.
+    "bibleTime": Extract the Bible Time section — telling the Bible story, reading scripture, dramatic presentation. Include the full story content and teacher instructions.
+    "talkAndMemorize": Extract the Talk and Memorize section — discussion of the lesson, memory verse practice activities, comprehension questions.
+    "sing": Extract the Sing section — songs to sing, lyrics if provided, hand motions or actions, how the song connects to the lesson.
+    "makeAndDo": Extract the Make and Do section — crafts, hands-on activities, games. Include materials lists and step-by-step instructions.
+    "finalFocus": Extract the Final Focus section — review, closing prayer, take-home reminders, transition/dismissal.
+  }
+
+Each lesson section should be structured as:
+{
+  "title": "Section name as written in the document",
+  "content": "The main narrative/descriptive content of this section",
+  "instructions": ["Step 1...", "Step 2...", ...],
+  "materials": ["item1", "item2", ...] (if any materials are listed, otherwise omit)
+}
+
+If a section is not found in the document, set it to null.
+
+IMPORTANT: Extract ALL fields thoroughly. Never skip or force-null a field — always extract what's present in the document.
 
 Respond with JSON:
 {
@@ -1215,18 +1254,29 @@ Respond with JSON:
       "memoryVerse": "...",
       "memoryVerseReference": "...",
       "worshipSign": "...",
-      "callAndResponse": {"leader": "...", "response": "..."} or null,
-      "activities": ["..."],
+      "callAndResponse": {"leader": "...", "response": "..."} or null if not present,
+      "activities": ["activity 1", "activity 2", ...] (extract all activities found),
       "prayerFocus": "...",
-      "songSuggestions": ["..."] or null
+      "songSuggestions": ["song 1", ...] or null if no songs mentioned,
+      "sidebarMeta": { "bibleTruths": "...", "scripture": "...", "scriptureText": "...", "lessonFocus": "...", "goalsForChildren": "...", "memoryMinute": "..." },
+      "preparation": "...",
+      "bibleBackground": "...",
+      "lessonSections": {
+        "welcome": { "title": "...", "content": "...", "instructions": ["..."], "materials": ["..."] },
+        "bibleTime": { "title": "...", "content": "...", "instructions": ["..."] },
+        "talkAndMemorize": { "title": "...", "content": "...", "instructions": ["..."] },
+        "sing": { "title": "...", "content": "...", "instructions": ["..."] },
+        "makeAndDo": { "title": "...", "content": "...", "instructions": ["..."], "materials": ["..."] },
+        "finalFocus": { "title": "...", "content": "...", "instructions": ["..."] }
+      }
     }
   ]
 }`,
       },
-      { role: "user", content: text.substring(0, 16000) },
+      { role: "user", content: text.substring(0, 24000) },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.5,
+    temperature: 0.3,
   });
 
   const lessonsData = JSON.parse(lessonsResponse.choices[0].message.content || '{"lessons":[]}');
@@ -1287,6 +1337,10 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
       prayerFocus: lesson.prayerFocus || "",
       songSuggestions: lesson.songSuggestions || null,
       preGeneratedQuiz: lesson.preGeneratedQuiz || [],
+      lessonSections: lesson.lessonSections || null,
+      sidebarMeta: lesson.sidebarMeta || null,
+      preparation: lesson.preparation || "",
+      bibleBackground: lesson.bibleBackground || "",
     });
   }
 

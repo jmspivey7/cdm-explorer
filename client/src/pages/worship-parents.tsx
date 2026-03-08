@@ -143,7 +143,7 @@ export default function WorshipParents() {
                       <p className="font-display font-bold text-gray-700">
                         Unit {unit.number}: {unit.title}
                       </p>
-                      <p className="text-sm text-gray-400">{unit.lessons.length} lessons</p>
+                      <p className="text-sm text-gray-400">{unit.lessonsCount || 0} lessons</p>
                     </button>
                   ))}
                 </div>

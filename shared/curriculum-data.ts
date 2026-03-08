@@ -24,6 +24,31 @@ export interface PreGeneratedQuiz {
   explanation: string;
 }
 
+export interface LessonSectionData {
+  title: string;
+  content: string;
+  instructions: string[];
+  materials?: string[];
+}
+
+export interface LessonSections {
+  welcome: LessonSectionData | null;
+  bibleTime: LessonSectionData | null;
+  talkAndMemorize: LessonSectionData | null;
+  sing: LessonSectionData | null;
+  makeAndDo: LessonSectionData | null;
+  finalFocus: LessonSectionData | null;
+}
+
+export interface SidebarMeta {
+  bibleTruths: string;
+  scripture: string;
+  scriptureText: string;
+  lessonFocus: string;
+  goalsForChildren: string;
+  memoryMinute: string;
+}
+
 export interface LessonData {
   id: number;
   unitId: number;
@@ -38,6 +63,10 @@ export interface LessonData {
   prayerFocus: string;
   songSuggestions: string[] | null;
   preGeneratedQuiz?: PreGeneratedQuiz[];
+  lessonSections?: LessonSections | null;
+  sidebarMeta?: SidebarMeta | null;
+  preparation?: string;
+  bibleBackground?: string;
 }
 
 export interface UnitOverview {
