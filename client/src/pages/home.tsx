@@ -43,11 +43,11 @@ export default function Home() {
               <span className="font-accent text-4xl text-se-green">Sermon</span>{" "}
               <span className="font-accent text-4xl text-se-blue">Explorer</span>
             </h2>
-            <p className="text-black font-display text-lg font-semibold mb-3">
+            <p className="text-black font-display text-lg font-semibold mb-3 whitespace-nowrap">
               <span className="font-accent text-xl">Sunday's Sermon, Brought to Life</span>
             </p>
             <p className="text-gray-500 text-sm mx-auto">
-              Interactive, illustrated storybooks that transform weekly sermons into engageing family experiences for all ages.
+              Interactive, illustrated storybooks that transform weekly sermons into engaging family experiences for all ages.
             </p>
           </motion.button>
 
@@ -65,7 +65,7 @@ export default function Home() {
               <span className="font-accent text-4xl text-se-green">Worship</span>{" "}
               <span className="font-accent text-4xl text-se-blue">Explorer</span>
             </h2>
-            <p className="text-black font-display text-lg font-semibold mb-3">
+            <p className="text-black font-display text-lg font-semibold mb-3 whitespace-nowrap">
               <span className="font-accent text-xl">Corporate Worship, Brought to Life</span>
             </p>
             <p className="text-gray-500 text-sm mx-auto">
@@ -88,7 +88,7 @@ export default function Home() {
               <span className="font-accent text-4xl text-se-green">Jesus</span>{" "}
               <span className="font-accent text-4xl text-se-blue">Explorer</span>
             </h2>
-            <p className="text-black font-display text-lg font-semibold mb-3">
+            <p className="text-black font-display text-lg font-semibold mb-3 whitespace-nowrap">
               <span className="font-accent text-xl">Show Me Jesus, Brought to Life</span>
             </p>
             <p className="text-gray-500 text-sm mx-auto">
