@@ -8,6 +8,9 @@ import OpenAI from "openai";
 import express from "express";
 import { WORSHIP_ELEMENTS } from "@shared/curriculum-data";
 import type { LessonData } from "@shared/curriculum-data";
+import { db } from "./db";
+import { sermons, worshipUnits as worshipUnitsTable, worshipLessons } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 function getOpenAI(): OpenAI {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -18,9 +21,6 @@ const openai = new Proxy({} as OpenAI, {
   }
 });
 const upload = multer({ dest: "uploads/" });
-
-const processedSermons: Map<string, any> = new Map();
-const worshipUnits: Map<number, any> = new Map();
 
 const uploadProgress: Map<string, {
   status: "processing" | "ready" | "error";
@@ -37,51 +37,68 @@ fs.mkdirSync(IMAGES_DIR, { recursive: true });
 export async function registerRoutes(server: Server, app: Express) {
   app.use("/generated", express.static(path.resolve("generated")));
 
-  app.get("/api/sermons", (_req, res) => {
-    const sermons = Array.from(processedSermons.entries()).map(([id, data]) => ({
-      id,
-      title: data.title,
-      scripture: data.scripture,
-      status: data.status,
-      sceneCount: data.scenes?.length || 0,
-      createdAt: data.createdAt,
-    }));
-    res.json(sermons);
+  app.get("/api/sermons", async (_req, res) => {
+    try {
+      const rows = await db.select().from(sermons);
+      const result = rows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        scripture: s.scripture,
+        status: s.status,
+        sceneCount: (s.scenes as any[])?.length || 0,
+        createdAt: s.createdAt,
+      }));
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch sermons", error: err.message });
+    }
   });
 
-  app.get("/api/sermons/:id", (req, res) => {
-    const sermon = processedSermons.get(req.params.id);
-    if (!sermon) return res.status(404).json({ message: "Sermon not found" });
-    res.json(sermon);
+  app.get("/api/sermons/:id", async (req, res) => {
+    try {
+      const [sermon] = await db.select().from(sermons).where(eq(sermons.id, req.params.id));
+      if (!sermon) return res.status(404).json({ message: "Sermon not found" });
+      res.json(sermon);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch sermon", error: err.message });
+    }
   });
 
-  app.delete("/api/sermons/:id", (req, res) => {
-    const sermon = processedSermons.get(req.params.id);
-    if (!sermon) return res.status(404).json({ message: "Sermon not found" });
+  app.delete("/api/sermons/:id", async (req, res) => {
+    try {
+      const sermonId = req.params.id;
+      const [sermon] = await db.select().from(sermons).where(eq(sermons.id, sermonId));
+      if (!sermon) return res.status(404).json({ message: "Sermon not found" });
 
-    const sermonId = req.params.id;
-    processedSermons.delete(sermonId);
+      await db.delete(sermons).where(eq(sermons.id, sermonId));
 
-    const imagesDir = path.resolve("generated", "images");
-    if (fs.existsSync(imagesDir)) {
-      const files = fs.readdirSync(imagesDir);
-      for (const file of files) {
-        if (file.startsWith(sermonId)) {
-          fs.unlinkSync(path.join(imagesDir, file));
+      const imagesDir = path.resolve("generated", "images");
+      if (fs.existsSync(imagesDir)) {
+        const files = fs.readdirSync(imagesDir);
+        for (const file of files) {
+          if (file.startsWith(sermonId)) {
+            fs.unlinkSync(path.join(imagesDir, file));
+          }
         }
       }
-    }
 
-    console.log(`Sermon deleted: ${sermonId}`);
-    res.json({ message: "Sermon deleted" });
+      console.log(`Sermon deleted: ${sermonId}`);
+      res.json({ message: "Sermon deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete sermon", error: err.message });
+    }
   });
 
-  app.get("/api/sermons/:id/scenes/:sceneIndex", (req, res) => {
-    const sermon = processedSermons.get(req.params.id);
-    if (!sermon) return res.status(404).json({ message: "Sermon not found" });
-    const scene = sermon.scenes?.[parseInt(req.params.sceneIndex)];
-    if (!scene) return res.status(404).json({ message: "Scene not found" });
-    res.json(scene);
+  app.get("/api/sermons/:id/scenes/:sceneIndex", async (req, res) => {
+    try {
+      const [sermon] = await db.select().from(sermons).where(eq(sermons.id, req.params.id));
+      if (!sermon) return res.status(404).json({ message: "Sermon not found" });
+      const scene = (sermon.scenes as any[])?.[parseInt(req.params.sceneIndex)];
+      if (!scene) return res.status(404).json({ message: "Scene not found" });
+      res.json(scene);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch scene", error: err.message });
+    }
   });
 
   app.post("/api/upload", upload.single("sermon"), async (req, res) => {
@@ -107,25 +124,20 @@ export async function registerRoutes(server: Server, app: Express) {
         return res.status(400).json({ message: "Unsupported file type. Use .docx, .pdf, or .txt" });
       }
 
-      processedSermons.set(sermonId, {
+      await db.insert(sermons).values({
         id: sermonId,
         title: "Processing...",
         scripture: "",
         status: "processing",
         rawText: text,
         scenes: [],
-        createdAt: new Date().toISOString(),
       });
 
       res.json({ sermonId, status: "processing", message: "Sermon uploaded. Processing started." });
 
-      processSermon(sermonId, text).catch((err) => {
+      processSermon(sermonId, text).catch(async (err) => {
         console.error("Pipeline error:", err);
-        const sermon = processedSermons.get(sermonId);
-        if (sermon) {
-          sermon.status = "error";
-          sermon.error = err.message;
-        }
+        await db.update(sermons).set({ status: "error", error: err.message }).where(eq(sermons.id, sermonId));
       });
     } catch (err: any) {
       res.status(500).json({ message: "Upload failed", error: err.message });
@@ -134,15 +146,19 @@ export async function registerRoutes(server: Server, app: Express) {
     }
   });
 
-  app.get("/api/sermons/:id/status", (req, res) => {
-    const sermon = processedSermons.get(req.params.id);
-    if (!sermon) return res.status(404).json({ message: "Sermon not found" });
-    res.json({
-      status: sermon.status,
-      progress: sermon.progress || 0,
-      currentStep: sermon.currentStep || "",
-      sceneCount: sermon.scenes?.length || 0,
-    });
+  app.get("/api/sermons/:id/status", async (req, res) => {
+    try {
+      const [sermon] = await db.select().from(sermons).where(eq(sermons.id, req.params.id));
+      if (!sermon) return res.status(404).json({ message: "Sermon not found" });
+      res.json({
+        status: sermon.status,
+        progress: sermon.progress || 0,
+        currentStep: sermon.currentStep || "",
+        sceneCount: (sermon.scenes as any[])?.length || 0,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch status", error: err.message });
+    }
   });
 
   app.post("/api/tts", async (req, res) => {
@@ -168,9 +184,13 @@ export async function registerRoutes(server: Server, app: Express) {
       const imageUrl = await generateImage(prompt, sermonId, sceneIndex);
 
       if (sermonId && sceneIndex !== undefined) {
-        const sermon = processedSermons.get(sermonId);
-        if (sermon?.scenes?.[sceneIndex]) {
-          sermon.scenes[sceneIndex].imageUrl = imageUrl;
+        const [sermon] = await db.select().from(sermons).where(eq(sermons.id, sermonId));
+        if (sermon) {
+          const scenes = (sermon.scenes as any[]) || [];
+          if (scenes[sceneIndex]) {
+            scenes[sceneIndex].imageUrl = imageUrl;
+            await db.update(sermons).set({ scenes }).where(eq(sermons.id, sermonId));
+          }
         }
       }
 
@@ -199,59 +219,90 @@ export async function registerRoutes(server: Server, app: Express) {
     res.json(WORSHIP_ELEMENTS);
   });
 
-  // 2. GET /api/worship/units - returns dynamically built list from worshipUnits
-  app.get("/api/worship/units", (_req, res) => {
-    const units = Array.from(worshipUnits.entries()).map(([id, unit]: [number, any]) => ({
-      id,
-      number: unit.number,
-      title: unit.title,
-      worshipElement: unit.worshipElement,
-      lessonsCount: unit.lessons?.length || 0,
-    }));
-    units.sort((a: any, b: any) => a.number - b.number);
-    res.json(units);
+  // 2. GET /api/worship/units - returns list from database
+  app.get("/api/worship/units", async (_req, res) => {
+    try {
+      const units = await db.select().from(worshipUnitsTable);
+      const result = [];
+      for (const unit of units) {
+        const lessons = await db.select().from(worshipLessons).where(eq(worshipLessons.unitId, unit.id));
+        result.push({
+          id: unit.id,
+          number: unit.number,
+          title: unit.title,
+          worshipElement: unit.worshipElement,
+          lessonsCount: lessons.length,
+        });
+      }
+      result.sort((a, b) => a.number - b.number);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch units", error: err.message });
+    }
   });
 
-  // 3. GET /api/worship/units/:id - returns unit detail
-  app.get("/api/worship/units/:id", (req, res) => {
-    const unitId = parseInt(req.params.id);
-    if (worshipUnits.has(unitId)) {
-      return res.json(worshipUnits.get(unitId));
+  // 3. GET /api/worship/units/:id - returns unit detail with lessons
+  app.get("/api/worship/units/:id", async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const [unit] = await db.select().from(worshipUnitsTable).where(eq(worshipUnitsTable.id, unitId));
+      if (!unit) return res.status(404).json({ message: "Unit not found. Upload curriculum to get started." });
+      const lessons = await db.select().from(worshipLessons).where(eq(worshipLessons.unitId, unitId));
+      res.json({
+        ...unit,
+        lessons: lessons.map((l) => ({
+          id: l.id,
+          unitId: l.unitId,
+          number: l.number,
+          title: l.title,
+          mainIdea: l.mainIdea,
+          memoryVerse: l.memoryVerse,
+          memoryVerseReference: l.memoryVerseReference,
+          worshipSign: l.worshipSign,
+          callAndResponse: l.callAndResponse,
+          activities: l.activities,
+          prayerFocus: l.prayerFocus,
+          songSuggestions: l.songSuggestions,
+          preGeneratedQuiz: l.preGeneratedQuiz,
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch unit", error: err.message });
     }
-    res.status(404).json({ message: "Unit not found. Upload curriculum to get started." });
   });
 
   // 4. GET /api/worship/lessons/:id - returns single lesson
-  app.get("/api/worship/lessons/:id", (req, res) => {
-    const lessonId = parseInt(req.params.id);
-    for (const unit of worshipUnits.values()) {
-      const foundLesson = unit.lessons?.find((l: LessonData) => l.id === lessonId);
-      if (foundLesson) {
-        return res.json(foundLesson);
-      }
+  app.get("/api/worship/lessons/:id", async (req, res) => {
+    try {
+      const lessonId = parseInt(req.params.id);
+      const [lesson] = await db.select().from(worshipLessons).where(eq(worshipLessons.id, lessonId));
+      if (!lesson) return res.status(404).json({ message: "Lesson not found" });
+      res.json(lesson);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch lesson", error: err.message });
     }
-    res.status(404).json({ message: "Lesson not found" });
   });
+
+  // Helper to fetch a lesson from DB
+  async function findLesson(lessonId: number) {
+    const [lesson] = await db.select().from(worshipLessons).where(eq(worshipLessons.id, lessonId));
+    return lesson || null;
+  }
 
   // 5. POST /api/worship/ai/generate-quiz - generates quiz for worship lesson
   app.post("/api/worship/ai/generate-quiz", async (req, res) => {
     try {
       const { lessonId, difficulty } = req.body;
-      let lesson: LessonData | undefined;
       const lessonIdNum = parseInt(lessonId);
-
-      for (const unit of worshipUnits.values()) {
-        lesson = unit.lessons?.find((l: LessonData) => l.id === lessonIdNum);
-        if (lesson) break;
-      }
+      const lesson = await findLesson(lessonIdNum);
 
       if (!lesson) {
         return res.status(404).json({ message: "Lesson not found" });
       }
 
-      // Check for pre-generated quiz first
-      if ((lesson as any).preGeneratedQuiz && (lesson as any).preGeneratedQuiz.length > 0) {
-        return res.json({ questions: (lesson as any).preGeneratedQuiz });
+      const quiz = lesson.preGeneratedQuiz as any[];
+      if (quiz && quiz.length > 0) {
+        return res.json({ questions: quiz });
       }
 
       const content = `
@@ -260,9 +311,9 @@ Main Idea: ${lesson.mainIdea}
 Memory Verse: ${lesson.memoryVerse} (${lesson.memoryVerseReference})
 Prayer Focus: ${lesson.prayerFocus}
 Worship Sign: ${lesson.worshipSign || "No sign for this lesson"}
-${lesson.callAndResponse ? `Call and Response - Leader: "${lesson.callAndResponse.leader}" Response: "${lesson.callAndResponse.response}"` : ""}
-${lesson.activities && lesson.activities.length > 0 ? `Activities: ${lesson.activities.join(", ")}` : ""}
-${lesson.songSuggestions && lesson.songSuggestions.length > 0 ? `Suggested Songs: ${lesson.songSuggestions.join(", ")}` : ""}
+${lesson.callAndResponse ? `Call and Response - Leader: "${(lesson.callAndResponse as any).leader}" Response: "${(lesson.callAndResponse as any).response}"` : ""}
+${lesson.activities && (lesson.activities as any[]).length > 0 ? `Activities: ${(lesson.activities as any[]).join(", ")}` : ""}
+${lesson.songSuggestions && (lesson.songSuggestions as any[]).length > 0 ? `Suggested Songs: ${(lesson.songSuggestions as any[]).join(", ")}` : ""}
       `.trim();
 
       const questions = await generateWorshipQuiz(content, difficulty || "medium");
@@ -276,13 +327,8 @@ ${lesson.songSuggestions && lesson.songSuggestions.length > 0 ? `Suggested Songs
   app.post("/api/worship/ai/teacher-assistant", async (req, res) => {
     try {
       const { lessonId, requestType } = req.body;
-      let lesson: LessonData | undefined;
       const lessonIdNum = parseInt(lessonId);
-
-      for (const unit of worshipUnits.values()) {
-        lesson = unit.lessons?.find((l: LessonData) => l.id === lessonIdNum);
-        if (lesson) break;
-      }
+      const lesson = await findLesson(lessonIdNum);
 
       if (!lesson) {
         return res.status(404).json({ message: "Lesson not found" });
@@ -333,19 +379,14 @@ Prayer Focus: ${lesson.prayerFocus}
   app.post("/api/worship/ai/parent-guide", async (req, res) => {
     try {
       const { lessonId } = req.body;
-      let lesson: LessonData | undefined;
       const lessonIdNum = parseInt(lessonId);
-
-      for (const unit of worshipUnits.values()) {
-        lesson = unit.lessons?.find((l: LessonData) => l.id === lessonIdNum);
-        if (lesson) break;
-      }
+      const lesson = await findLesson(lessonIdNum);
 
       if (!lesson) {
         return res.status(404).json({ message: "Lesson not found" });
       }
 
-      const guide = await generateParentGuide(lesson);
+      const guide = await generateParentGuide(lesson as any);
       res.json(guide);
     } catch (err: any) {
       res.status(500).json({ message: "Parent guide generation failed", error: err.message });
@@ -411,46 +452,50 @@ Prayer Focus: ${lesson.prayerFocus}
   });
 
   // 11. DELETE /api/worship/units/:id - deletes uploaded worship unit
-  app.delete("/api/worship/units/:id", (req, res) => {
-    const unitId = parseInt(req.params.id);
-    if (!worshipUnits.has(unitId)) {
-      return res.status(404).json({ message: "Unit not found" });
+  app.delete("/api/worship/units/:id", async (req, res) => {
+    try {
+      const unitId = parseInt(req.params.id);
+      const [unit] = await db.select().from(worshipUnitsTable).where(eq(worshipUnitsTable.id, unitId));
+      if (!unit) return res.status(404).json({ message: "Unit not found" });
+
+      await db.delete(worshipUnitsTable).where(eq(worshipUnitsTable.id, unitId));
+      console.log(`Worship unit deleted: ${unitId}`);
+      res.json({ message: "Unit deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete unit", error: err.message });
     }
-    worshipUnits.delete(unitId);
-    console.log(`Worship unit deleted: ${unitId}`);
-    res.json({ message: "Unit deleted" });
   });
 }
 
 async function processSermon(sermonId: string, text: string) {
-  const sermon = processedSermons.get(sermonId)!;
-
-  const updateProgress = (step: string, progress: number) => {
-    sermon.currentStep = step;
-    sermon.progress = progress;
+  const updateSermon = async (data: Partial<typeof sermons.$inferInsert>) => {
+    await db.update(sermons).set(data).where(eq(sermons.id, sermonId));
   };
 
-  updateProgress("Analyzing sermon structure...", 10);
+  await updateSermon({ currentStep: "Analyzing sermon structure...", progress: 10 });
   const analysis = await analyzeSermon(text);
-  sermon.title = analysis.title;
-  sermon.scripture = analysis.scripture;
-  sermon.summary = analysis.summary;
-  sermon.keyThemes = analysis.keyThemes;
+  await updateSermon({
+    title: analysis.title,
+    scripture: analysis.scripture,
+    summary: analysis.summary,
+    keyThemes: analysis.keyThemes,
+  });
 
-  updateProgress("Breaking sermon into scenes...", 20);
+  await updateSermon({ currentStep: "Breaking sermon into scenes...", progress: 20 });
   const scenes = await generateScenes(text, analysis);
-  sermon.scenes = scenes;
+  await updateSermon({ scenes });
 
-  updateProgress("Writing age-appropriate narratives...", 35);
+  await updateSermon({ currentStep: "Writing age-appropriate narratives...", progress: 35 });
   for (let i = 0; i < scenes.length; i++) {
-    updateProgress(`Writing narratives for scene ${i + 1}/${scenes.length}...`, 35 + (i / scenes.length) * 15);
+    await updateSermon({ currentStep: `Writing narratives for scene ${i + 1}/${scenes.length}...`, progress: Math.round(35 + (i / scenes.length) * 15) });
     const narratives = await generateNarratives(scenes[i], i, scenes.length);
     scenes[i].narratives = narratives;
   }
+  await updateSermon({ scenes });
 
-  updateProgress("Generating illustrations...", 50);
+  await updateSermon({ currentStep: "Generating illustrations...", progress: 50 });
   for (let i = 0; i < scenes.length; i++) {
-    updateProgress(`Illustrating scene ${i + 1}/${scenes.length}...`, 50 + (i / scenes.length) * 25);
+    await updateSermon({ currentStep: `Illustrating scene ${i + 1}/${scenes.length}...`, progress: Math.round(50 + (i / scenes.length) * 25) });
     try {
       const imageUrl = await generateImage(scenes[i].imagePrompt, sermonId, i);
       scenes[i].imageUrl = imageUrl;
@@ -462,8 +507,9 @@ async function processSermon(sermonId: string, text: string) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
+  await updateSermon({ scenes });
 
-  updateProgress("Creating quizzes and discussion prompts...", 80);
+  await updateSermon({ currentStep: "Creating quizzes and discussion prompts...", progress: 80 });
   for (let i = 0; i < scenes.length; i++) {
     const narrativeText = scenes[i].narratives
       ? `Young version: ${scenes[i].narratives.young}\n\nOlder version: ${scenes[i].narratives.older}\n\nFamily version: ${scenes[i].narratives.family}`
@@ -474,10 +520,12 @@ async function processSermon(sermonId: string, text: string) {
     scenes[i].discussionPrompts = discussion;
   }
 
-  updateProgress("Assembling experience...", 98);
-  sermon.status = "ready";
-  sermon.progress = 100;
-  sermon.currentStep = "Complete";
+  await updateSermon({
+    scenes,
+    currentStep: "Complete",
+    progress: 100,
+    status: "ready",
+  });
 }
 
 async function analyzeSermon(text: string) {
@@ -1209,19 +1257,25 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
     }
   }
 
-  // Step 4: Build and store unit
+  // Step 4: Build and store unit in database
   updateUploadProgress("Organizing curriculum...", 90);
-  const numericUnitId = parseInt(uploadId.replace("worship-", ""));
 
-  const unitDetail = {
-    id: numericUnitId,
-    number: worshipUnits.size + 1, // Sequential unit numbering
+  const [{ maxNum }] = await db.select({ maxNum: sql<number>`coalesce(max(${worshipUnitsTable.number}), 0)` }).from(worshipUnitsTable);
+  const nextNumber = (maxNum || 0) + 1;
+
+  const [insertedUnit] = await db.insert(worshipUnitsTable).values({
+    number: nextNumber,
     title: structure.unitTitle || "Uploaded Curriculum",
     description: structure.unitDescription || `Curriculum about ${structure.worshipElement || "worship"}`,
     worshipElement: structure.worshipElement || "Worship",
-    lessons: lessons.map((lesson: any, idx: number) => ({
-      id: numericUnitId * 100 + idx + 1,
-      unitId: numericUnitId,
+  }).returning();
+
+  const unitId = insertedUnit.id;
+
+  for (let idx = 0; idx < lessons.length; idx++) {
+    const lesson = lessons[idx];
+    await db.insert(worshipLessons).values({
+      unitId,
       number: idx + 1,
       title: lesson.title || `Lesson ${idx + 1}`,
       mainIdea: lesson.mainIdea || "",
@@ -1233,14 +1287,12 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
       prayerFocus: lesson.prayerFocus || "",
       songSuggestions: lesson.songSuggestions || null,
       preGeneratedQuiz: lesson.preGeneratedQuiz || [],
-    })),
-  };
-
-  worshipUnits.set(numericUnitId, unitDetail);
+    });
+  }
 
   // Step 5: Finalize
   updateUploadProgress("Complete", 100);
   progress.status = "ready";
-  progress.unitId = numericUnitId;
-  console.log(`Worship curriculum processed and stored: ${uploadId} (${unitDetail.lessons.length} lessons, quizzes generated)`);
+  progress.unitId = unitId;
+  console.log(`Worship curriculum processed and stored: ${uploadId} (${lessons.length} lessons, quizzes generated)`);
 }
