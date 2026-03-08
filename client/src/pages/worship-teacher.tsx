@@ -618,11 +618,21 @@ export default function WorshipTeacher() {
                                       {aiContent.type === "discussion" && aiContent.questions && (
                                         <>
                                           <h4 className="font-display font-bold text-gray-700 text-sm">Discussion Questions</h4>
-                                          <ol className="space-y-2">
-                                            {aiContent.questions.map((q: string, i: number) => (
-                                              <li key={i} className="text-gray-600 text-sm flex gap-2">
-                                                <span className="text-se-blue font-bold">{i + 1}.</span>
-                                                <span>{q}</span>
+                                          <ol className="space-y-3">
+                                            {aiContent.questions.map((q: any, i: number) => (
+                                              <li key={i} className="text-gray-600 text-sm">
+                                                <div className="flex gap-2">
+                                                  <span className="text-se-blue font-bold flex-shrink-0">{i + 1}.</span>
+                                                  <div>
+                                                    <span className="font-medium text-gray-700">{typeof q === "string" ? q : q.question || q.text || JSON.stringify(q)}</span>
+                                                    {typeof q === "object" && q.followUp && (
+                                                      <p className="text-gray-500 text-xs mt-1">Follow-up: {q.followUp}</p>
+                                                    )}
+                                                    {typeof q === "object" && q.connection && (
+                                                      <p className="text-gray-400 text-xs mt-0.5 italic">{q.connection}</p>
+                                                    )}
+                                                  </div>
+                                                </div>
                                               </li>
                                             ))}
                                           </ol>
@@ -634,8 +644,8 @@ export default function WorshipTeacher() {
                                           {aiContent.illustrations.map((ill: any, i: number) => (
                                             <div key={i} className="border-l-2 border-se-blue/30 pl-3">
                                               <p className="font-display font-bold text-gray-700 text-sm">{ill.title || `Illustration ${i + 1}`}</p>
-                                              <p className="text-gray-600 text-sm mt-1">{ill.description || ill}</p>
-                                              {ill.materials && <p className="text-gray-400 text-xs mt-1">Materials: {ill.materials}</p>}
+                                              <p className="text-gray-600 text-sm mt-1">{typeof ill === "string" ? ill : ill.description || ill.explanation || JSON.stringify(ill)}</p>
+                                              {ill.materials && <p className="text-gray-400 text-xs mt-1">Materials: {Array.isArray(ill.materials) ? ill.materials.join(", ") : ill.materials}</p>}
                                             </div>
                                           ))}
                                         </>
@@ -646,8 +656,8 @@ export default function WorshipTeacher() {
                                           {aiContent.activities.map((act: any, i: number) => (
                                             <div key={i} className="border-l-2 border-se-green/30 pl-3">
                                               <p className="font-display font-bold text-gray-700 text-sm">{act.title || `Activity ${i + 1}`}</p>
-                                              <p className="text-gray-600 text-sm mt-1">{act.description || act}</p>
-                                              {act.materials && <p className="text-gray-400 text-xs mt-1">Materials: {act.materials}</p>}
+                                              <p className="text-gray-600 text-sm mt-1">{typeof act === "string" ? act : act.description || act.instructions || JSON.stringify(act)}</p>
+                                              {act.materials && <p className="text-gray-400 text-xs mt-1">Materials: {Array.isArray(act.materials) ? act.materials.join(", ") : act.materials}</p>}
                                             </div>
                                           ))}
                                         </>

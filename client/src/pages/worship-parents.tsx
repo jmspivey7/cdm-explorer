@@ -40,13 +40,14 @@ interface UnitDetail {
 }
 
 interface ParentGuide {
-  lessonTitle: string;
+  lessonTitle?: string;
   summary: string;
-  memoryVerse: string;
-  memoryVersePractice: string;
-  familyActivities: { title: string; materials: string; instructions: string }[];
-  discussionStarters: string[];
-  prayerFocus: string;
+  memoryVerse?: string;
+  memoryVersePractice: string[] | string;
+  familyActivities?: { title: string; materials: string | string[]; instructions: string }[];
+  activities?: { title: string; duration?: string; materials: string | string[]; instructions: string }[];
+  discussionStarters?: string[];
+  prayerFocus?: string;
 }
 
 export default function WorshipParents() {
@@ -85,7 +86,7 @@ export default function WorshipParents() {
         body: JSON.stringify({ lessonId }),
       });
       const data = await res.json();
-      setGuideData(data.guide);
+      setGuideData(data.guide || data);
     } catch (err: any) {
       setGuideData({
         lessonTitle: "Error",
@@ -220,64 +221,100 @@ export default function WorshipParents() {
               <h2 className="font-display font-bold text-gray-800 mb-2">
                 This Week's Lesson
               </h2>
-              <h3 className="text-se-blue font-display font-bold text-lg mb-3">
-                {guideData.lessonTitle}
-              </h3>
+              {(guideData.lessonTitle || lessonData?.title) && (
+                <h3 className="text-se-blue font-display font-bold text-lg mb-3">
+                  {guideData.lessonTitle || lessonData?.title}
+                </h3>
+              )}
               <p className="text-gray-600">{guideData.summary}</p>
             </div>
 
             {/* Memory Verse */}
-            <div className="bg-white border-2 border-se-green/30 rounded-2xl p-6">
-              <h2 className="font-display font-bold text-se-green mb-3">Memory Verse</h2>
-              <p className="text-gray-700 italic mb-2 text-lg">{guideData.memoryVerse}</p>
-              <div className="bg-se-green/5 border border-se-green/20 rounded-xl p-4">
-                <p className="text-sm text-gray-700">
-                  <span className="font-bold">Practice Tips:</span> {guideData.memoryVersePractice}
-                </p>
+            {(guideData.memoryVerse || lessonData?.memoryVerse || guideData.memoryVersePractice) && (
+              <div className="bg-white border-2 border-se-green/30 rounded-2xl p-6">
+                <h2 className="font-display font-bold text-se-green mb-3">Memory Verse</h2>
+                {(guideData.memoryVerse || lessonData?.memoryVerse) && (
+                  <p className="text-gray-700 italic mb-2 text-lg">
+                    {guideData.memoryVerse || lessonData?.memoryVerse}
+                    {lessonData?.memoryVerseReference && (
+                      <span className="text-gray-400 text-sm not-italic ml-2">— {lessonData.memoryVerseReference}</span>
+                    )}
+                  </p>
+                )}
+                {guideData.memoryVersePractice && (
+                  <div className="bg-se-green/5 border border-se-green/20 rounded-xl p-4">
+                    <p className="text-xs font-bold text-se-green uppercase tracking-wider mb-2">Practice Tips</p>
+                    {Array.isArray(guideData.memoryVersePractice) ? (
+                      <ul className="space-y-1">
+                        {guideData.memoryVersePractice.map((tip, i) => (
+                          <li key={i} className="text-sm text-gray-700 flex gap-2">
+                            <span className="text-se-green font-bold">•</span>
+                            <span>{tip}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-700">{guideData.memoryVersePractice}</p>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Family Activities */}
-            <div className="bg-white border-2 border-se-blue/30 rounded-2xl p-6">
-              <h2 className="font-display font-bold text-se-blue mb-4">Family Activities</h2>
-              <div className="space-y-4">
-                {guideData.familyActivities.map((activity, idx) => (
-                  <div key={idx} className="bg-se-blue/5 border border-se-blue/20 rounded-xl p-4">
-                    <h3 className="font-display font-bold text-gray-800 mb-2">
-                      {activity.title}
-                    </h3>
-                    <div className="space-y-2 text-sm text-gray-700">
-                      <div>
-                        <span className="font-bold text-gray-800">Materials:</span> {activity.materials}
+            {(() => {
+              const acts = guideData.familyActivities || guideData.activities || [];
+              return acts.length > 0 ? (
+                <div className="bg-white border-2 border-se-blue/30 rounded-2xl p-6">
+                  <h2 className="font-display font-bold text-se-blue mb-4">Family Activities</h2>
+                  <div className="space-y-4">
+                    {acts.map((activity, idx) => (
+                      <div key={idx} className="bg-se-blue/5 border border-se-blue/20 rounded-xl p-4">
+                        <h3 className="font-display font-bold text-gray-800 mb-2">
+                          {activity.title}
+                          {activity.duration && <span className="text-gray-400 text-sm font-normal ml-2">({activity.duration})</span>}
+                        </h3>
+                        <div className="space-y-2 text-sm text-gray-700">
+                          {activity.materials && (
+                            <div>
+                              <span className="font-bold text-gray-800">Materials:</span>{" "}
+                              {Array.isArray(activity.materials) ? activity.materials.join(", ") : activity.materials}
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-bold text-gray-800">Instructions:</span>{" "}
+                            {activity.instructions}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-bold text-gray-800">Instructions:</span>{" "}
-                        {activity.instructions}
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              ) : null;
+            })()}
 
             {/* Discussion Starters */}
-            <div className="bg-white border-2 border-se-purple/30 rounded-2xl p-6">
-              <h2 className="font-display font-bold text-se-purple mb-4">Discussion Starters</h2>
-              <div className="space-y-3">
-                {guideData.discussionStarters.map((starter, idx) => (
-                  <div key={idx} className="flex gap-3">
-                    <span className="text-se-purple font-bold flex-shrink-0">•</span>
-                    <p className="text-gray-700">{starter}</p>
-                  </div>
-                ))}
+            {guideData.discussionStarters?.length > 0 && (
+              <div className="bg-white border-2 border-se-purple/30 rounded-2xl p-6">
+                <h2 className="font-display font-bold text-se-purple mb-4">Discussion Starters</h2>
+                <div className="space-y-3">
+                  {guideData.discussionStarters.map((starter, idx) => (
+                    <div key={idx} className="flex gap-3">
+                      <span className="text-se-purple font-bold flex-shrink-0">•</span>
+                      <p className="text-gray-700">{starter}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Prayer Focus */}
-            <div className="bg-white border-2 border-se-green/30 rounded-2xl p-6">
-              <h2 className="font-display font-bold text-se-green mb-3">Prayer Focus</h2>
-              <p className="text-gray-700">{guideData.prayerFocus}</p>
-            </div>
+            {guideData.prayerFocus && (
+              <div className="bg-white border-2 border-se-green/30 rounded-2xl p-6">
+                <h2 className="font-display font-bold text-se-green mb-3">Prayer Focus</h2>
+                <p className="text-gray-700">{guideData.prayerFocus}</p>
+              </div>
+            )}
           </motion.div>
         ) : null}
       </div>
