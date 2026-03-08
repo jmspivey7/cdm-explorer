@@ -139,26 +139,26 @@ export default function UploadPage() {
         )}
 
         {(status === "uploading" || status === "processing") && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center pt-12">
-            <div className="relative w-24 h-24 mx-auto mb-6">
-              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth="8" />
-                <circle
-                  cx="50" cy="50" r="45" fill="none" stroke="#1d88a9" strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={`${progress * 2.83} 283`}
-                  className="transition-all duration-500"
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-8">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-5 bg-se-blue/5 border border-se-blue/20 rounded-xl"
+            >
+              <p className="text-sm text-gray-700 mb-3 font-display font-bold">
+                {currentStep || "Starting..."}
+              </p>
+              <div className="w-full h-3 rounded-full bg-gray-200 overflow-hidden mb-2">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3 }}
+                  className="h-full bg-se-blue"
                 />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-gray-800 font-display font-bold text-xl">{Math.round(progress)}%</span>
               </div>
-            </div>
-            <h2 className="font-display text-xl font-bold text-gray-800 mb-2">
-              {status === "uploading" ? "Uploading..." : "Creating Your Storybook"}
-            </h2>
-            <p className="text-se-blue text-sm font-display">{currentStep || "Starting..."}</p>
-            <p className="text-gray-400 text-xs mt-4 max-w-xs mx-auto">
+              <p className="text-xs text-gray-500 font-display">{Math.round(progress)}%</p>
+            </motion.div>
+            <p className="text-gray-400 text-xs mt-4 text-center max-w-xs mx-auto">
               This may take a few minutes as we generate illustrations and content
             </p>
           </motion.div>

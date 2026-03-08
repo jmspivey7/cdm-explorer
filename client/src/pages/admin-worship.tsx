@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +14,8 @@ interface Unit {
 interface UploadStatus {
   status: "processing" | "ready" | "error";
   currentStep: string;
-  percentage: number;
+  progress: number;
+  percentage?: number;
   error?: string;
 }
 
@@ -47,19 +48,16 @@ export default function AdminWorship() {
     refetchInterval: uploadId ? 1000 : false,
   });
 
-  const handleUploadComplete = () => {
-    if (uploadStatus?.status === "ready") {
+  useEffect(() => {
+    if (!uploadStatus || !uploadId) return;
+    if (uploadStatus.status === "ready") {
       setUploadId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/worship/units"] });
-    } else if (uploadStatus?.status === "error") {
+    } else if (uploadStatus.status === "error") {
       setUploadError(uploadStatus.error || "Upload failed");
       setUploadId(null);
     }
-  };
-
-  if (uploadStatus && uploadId) {
-    handleUploadComplete();
-  }
+  }, [uploadStatus, uploadId]);
 
   async function handleDelete(unitId: number) {
     setDeletingId(unitId);
@@ -234,7 +232,7 @@ export default function AdminWorship() {
               <div className="w-full h-3 rounded-full bg-gray-200 overflow-hidden mb-2">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${uploadStatus.percentage}%` }}
+                  animate={{ width: `${uploadStatus.progress}%` }}
                   transition={{ duration: 0.3 }}
                   className={`h-full ${
                     uploadStatus.status === "error"
@@ -245,7 +243,7 @@ export default function AdminWorship() {
                   }`}
                 />
               </div>
-              <p className="text-xs text-gray-500 font-display">{uploadStatus.percentage}%</p>
+              <p className="text-xs text-gray-500 font-display">{uploadStatus.progress}%</p>
               {uploadStatus.status === "ready" && (
                 <p className="text-sm text-se-green font-display font-bold mt-2">Upload complete!</p>
               )}
