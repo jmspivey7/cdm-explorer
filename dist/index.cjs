@@ -770,118 +770,28 @@ var init_smj_routes = __esm({
   }
 });
 
-// vite.config.ts
-var import_vite, import_plugin_react, import_path3, import_url, import_meta, __dirname2, vite_config_default;
-var init_vite_config = __esm({
-  "vite.config.ts"() {
-    "use strict";
-    import_vite = require("vite");
-    import_plugin_react = __toESM(require("@vitejs/plugin-react"), 1);
-    import_path3 = __toESM(require("path"), 1);
-    import_url = require("url");
-    import_meta = {};
-    __dirname2 = import_path3.default.dirname((0, import_url.fileURLToPath)(import_meta.url));
-    vite_config_default = (0, import_vite.defineConfig)({
-      plugins: [(0, import_plugin_react.default)()],
-      resolve: {
-        alias: {
-          "@": import_path3.default.resolve(__dirname2, "client", "src"),
-          "@shared": import_path3.default.resolve(__dirname2, "shared"),
-          "@assets": import_path3.default.resolve(__dirname2, "attached_assets")
-        }
-      },
-      root: import_path3.default.resolve(__dirname2, "client"),
-      build: {
-        outDir: import_path3.default.resolve(__dirname2, "dist", "public"),
-        emptyOutDir: true
-      },
-      server: {
-        proxy: {
-          "/api": "http://localhost:5000"
-        }
-      }
-    });
-  }
-});
-
-// server/vite.ts
-var vite_exports = {};
-__export(vite_exports, {
-  setupVite: () => setupVite
-});
-async function setupVite(server2, app2) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server: server2, path: "/vite-hmr" },
-    allowedHosts: true
-  };
-  const vite = await (0, import_vite2.createServer)({
-    ...vite_config_default,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      }
-    },
-    server: serverOptions,
-    appType: "custom"
-  });
-  app2.use(vite.middlewares);
-  app2.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-    try {
-      const clientTemplate = import_path4.default.resolve(__dirname3, "..", "client", "index.html");
-      let template = await import_fs3.default.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(`src="/src/main.tsx"`, `src="/src/main.tsx?v=${(0, import_nanoid.nanoid)()}"`);
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e);
-      next(e);
-    }
-  });
-}
-var import_vite2, import_fs3, import_path4, import_url2, import_nanoid, import_meta2, __filename, __dirname3, viteLogger;
-var init_vite = __esm({
-  "server/vite.ts"() {
-    "use strict";
-    import_vite2 = require("vite");
-    init_vite_config();
-    import_fs3 = __toESM(require("fs"), 1);
-    import_path4 = __toESM(require("path"), 1);
-    import_url2 = require("url");
-    import_nanoid = require("nanoid");
-    import_meta2 = {};
-    __filename = (0, import_url2.fileURLToPath)(import_meta2.url);
-    __dirname3 = import_path4.default.dirname(__filename);
-    viteLogger = (0, import_vite2.createLogger)();
-  }
-});
-
 // server/static.ts
 var static_exports = {};
 __export(static_exports, {
   serveStatic: () => serveStatic
 });
 function serveStatic(app2) {
-  const distPath = import_path5.default.resolve(__dirname, "public");
-  if (!import_fs4.default.existsSync(distPath)) {
+  const distPath = import_path3.default.resolve(__dirname, "public");
+  if (!import_fs3.default.existsSync(distPath)) {
     throw new Error(`Could not find the build directory: ${distPath}`);
   }
   app2.use(import_express2.default.static(distPath));
   app2.use("/{*path}", (_req, res) => {
-    res.sendFile(import_path5.default.resolve(distPath, "index.html"));
+    res.sendFile(import_path3.default.resolve(distPath, "index.html"));
   });
 }
-var import_express2, import_fs4, import_path5;
+var import_express2, import_fs3, import_path3;
 var init_static = __esm({
   "server/static.ts"() {
     "use strict";
     import_express2 = __toESM(require("express"), 1);
-    import_fs4 = __toESM(require("fs"), 1);
-    import_path5 = __toESM(require("path"), 1);
+    import_fs3 = __toESM(require("fs"), 1);
+    import_path3 = __toESM(require("path"), 1);
   }
 });
 
@@ -2306,8 +2216,8 @@ var server = (0, import_http.createServer)(app);
   await registerRoutes(server, app);
   const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
-    const { setupVite: setupVite2 } = await Promise.resolve().then(() => (init_vite(), vite_exports));
-    await setupVite2(server, app);
+    const { setupVite } = await import("./vite");
+    await setupVite(server, app);
   } else {
     const { serveStatic: serveStatic2 } = await Promise.resolve().then(() => (init_static(), static_exports));
     serveStatic2(app);
