@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +22,7 @@ export default function WorshipChildren() {
   const [childName, setChildName] = useState("");
   const [nameEntered, setNameEntered] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
+  const [pendingActivity, setPendingActivity] = useState<ChildView | null>(null);
 
   const { data: units, isLoading: unitsLoading } = useQuery<Unit[]>({
     queryKey: ["/api/worship/units"],
@@ -31,6 +32,14 @@ export default function WorshipChildren() {
     },
     enabled: currentView === "unitselect",
   });
+
+  useEffect(() => {
+    if (currentView === "unitselect" && units && units.length === 1 && pendingActivity) {
+      setSelectedUnitId(units[0].id);
+      setCurrentView(pendingActivity);
+      setPendingActivity(null);
+    }
+  }, [currentView, units, pendingActivity]);
 
   const activities: { id: ChildView; title: string; icon: typeof BookOpen; color: string; textColor: string }[] = [
     {
@@ -173,6 +182,7 @@ export default function WorshipChildren() {
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => {
+                      setPendingActivity(activity.id);
                       setCurrentView("unitselect");
                       setSelectedUnitId(null);
                     }}
@@ -219,14 +229,22 @@ export default function WorshipChildren() {
                 </motion.button>
               </div>
             ) : units.length === 1 ? (
-              (() => {
-                const unit = units[0];
-                setSelectedUnitId(unit.id);
-                const selectedActivity = activities.find(a => currentView === a.id) || activities[0];
-                const nextView = selectedActivity.id;
-                setTimeout(() => setCurrentView(nextView), 0);
-                return null;
-              })()
+              pendingActivity ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 font-display text-lg mb-6">Something went wrong</p>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentView("menu")}
+                    className="px-6 py-3 bg-gray-100 text-gray-700 font-display font-bold rounded-2xl hover:bg-gray-200 transition-all"
+                  >
+                    Back to Menu
+                  </motion.button>
+                </div>
+              )
             ) : (
               <div>
                 <p className="text-gray-600 font-display text-center mb-8">Choose a unit:</p>
@@ -241,8 +259,12 @@ export default function WorshipChildren() {
                       whileTap={{ scale: 0.97 }}
                       onClick={() => {
                         setSelectedUnitId(unit.id);
-                        const selectedActivity = activities.find(a => a.id !== "menu") || activities[0];
-                        setCurrentView(selectedActivity.id);
+                        if (pendingActivity) {
+                          setCurrentView(pendingActivity);
+                          setPendingActivity(null);
+                        } else {
+                          setCurrentView("menu");
+                        }
                       }}
                       className="bg-white border-2 border-se-blue/30 rounded-2xl p-6 hover:shadow-md transition-all text-left hover:bg-se-blue/5"
                     >
