@@ -770,31 +770,6 @@ var init_smj_routes = __esm({
   }
 });
 
-// server/static.ts
-var static_exports = {};
-__export(static_exports, {
-  serveStatic: () => serveStatic
-});
-function serveStatic(app2) {
-  const distPath = import_path3.default.resolve(__dirname, "public");
-  if (!import_fs3.default.existsSync(distPath)) {
-    throw new Error(`Could not find the build directory: ${distPath}`);
-  }
-  app2.use(import_express2.default.static(distPath));
-  app2.use("/{*path}", (_req, res) => {
-    res.sendFile(import_path3.default.resolve(distPath, "index.html"));
-  });
-}
-var import_express2, import_fs3, import_path3;
-var init_static = __esm({
-  "server/static.ts"() {
-    "use strict";
-    import_express2 = __toESM(require("express"), 1);
-    import_fs3 = __toESM(require("fs"), 1);
-    import_path3 = __toESM(require("path"), 1);
-  }
-});
-
 // server/index.ts
 var import_express3 = __toESM(require("express"), 1);
 var import_http = require("http");
@@ -2207,6 +2182,21 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
   console.log(`Worship curriculum processed and stored: ${uploadId} (${lessons.length} lessons, quizzes generated)`);
 }
 
+// server/static.ts
+var import_express2 = __toESM(require("express"), 1);
+var import_fs3 = __toESM(require("fs"), 1);
+var import_path3 = __toESM(require("path"), 1);
+function serveStatic(app2) {
+  const distPath = import_path3.default.resolve(__dirname, "public");
+  if (!import_fs3.default.existsSync(distPath)) {
+    throw new Error(`Could not find the build directory: ${distPath}`);
+  }
+  app2.use(import_express2.default.static(distPath));
+  app2.use("/{*path}", (_req, res) => {
+    res.sendFile(import_path3.default.resolve(distPath, "index.html"));
+  });
+}
+
 // server/index.ts
 var app = (0, import_express3.default)();
 app.use(import_express3.default.json({ limit: "10mb" }));
@@ -2219,8 +2209,7 @@ var server = (0, import_http.createServer)(app);
     const { setupVite } = await import("./vite");
     await setupVite(server, app);
   } else {
-    const { serveStatic: serveStatic2 } = await Promise.resolve().then(() => (init_static(), static_exports));
-    serveStatic2(app);
+    serveStatic(app);
   }
   const port = 5e3;
   server.listen(port, "0.0.0.0", () => {

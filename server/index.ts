@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
+import { serveStatic } from "./static";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -16,7 +17,6 @@ const server = createServer(app);
     const { setupVite } = await import("./vite");
     await setupVite(server, app);
   } else {
-    const { serveStatic } = await import("./static");
     serveStatic(app);
   }
 
