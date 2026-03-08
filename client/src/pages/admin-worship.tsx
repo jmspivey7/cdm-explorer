@@ -84,7 +84,7 @@ export default function AdminWorship() {
 
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("document", selectedFile);
 
       const res = await fetch("/api/worship/upload", {
         method: "POST",
@@ -92,8 +92,13 @@ export default function AdminWorship() {
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        setUploadError(error.message || "Failed to upload curriculum");
+        const text = await res.text();
+        try {
+          const error = JSON.parse(text);
+          setUploadError(error.message || "Failed to upload curriculum");
+        } catch {
+          setUploadError("Failed to upload curriculum");
+        }
         setUploading(false);
         return;
       }
