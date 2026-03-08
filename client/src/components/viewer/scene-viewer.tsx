@@ -75,22 +75,30 @@ export default function SceneViewer({ scene, sceneIndex, totalScenes, ageGroup, 
         URL.revokeObjectURL(url);
       };
       audio.onerror = () => {
-        fallbackSpeak(narrative);
+        setNarrationDone(true);
       };
-      audio.play().catch(() => {
-        fallbackSpeak(narrative);
-      });
+      try {
+        await audio.play();
+      } catch {
+        audioRef.current = audio;
+        setWaitingForInteraction(true);
+      }
     } catch {
-      fallbackSpeak(narrative);
+      setNarrationDone(true);
     }
   }, [narrative, narrationStarted]);
 
-  function fallbackSpeak(text: string) {
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.85;
-    u.pitch = 1.05;
-    u.onend = () => setNarrationDone(true);
-    speechSynthesis.speak(u);
+  const [waitingForInteraction, setWaitingForInteraction] = useState(false);
+
+  function resumeAudio() {
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        setWaitingForInteraction(false);
+      }).catch(() => {
+        setNarrationDone(true);
+        setWaitingForInteraction(false);
+      });
+    }
   }
 
   useEffect(() => {
@@ -98,6 +106,7 @@ export default function SceneViewer({ scene, sceneIndex, totalScenes, ageGroup, 
     setNarrationDone(false);
     setShowContent(false);
     setNarrationStarted(false);
+    setWaitingForInteraction(false);
 
     const contentTimer = setTimeout(() => setShowContent(true), 500);
 
@@ -110,7 +119,6 @@ export default function SceneViewer({ scene, sceneIndex, totalScenes, ageGroup, 
         audioRef.current.pause();
         audioRef.current = null;
       }
-      speechSynthesis.cancel();
     };
   }, [sceneIndex]);
 
@@ -220,6 +228,20 @@ export default function SceneViewer({ scene, sceneIndex, totalScenes, ageGroup, 
               {isLast ? "Finish Story" : "Next Scene"}
             </span>
             <ChevronRight className="w-4 h-4 text-white" />
+          </motion.button>
+        ) : waitingForInteraction ? (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={resumeAudio}
+            className="w-full rounded-2xl p-4 bg-se-green flex items-center justify-center gap-2
+                       hover:bg-se-green/90 transition-all shadow-lg shadow-se-green/20"
+          >
+            <Volume2 className="w-4 h-4 text-white" />
+            <span className="font-display font-bold text-white text-sm">
+              Tap to listen
+            </span>
           </motion.button>
         ) : (
           <div className="flex items-center justify-center gap-2 py-3">
