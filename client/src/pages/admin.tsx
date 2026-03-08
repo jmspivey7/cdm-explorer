@@ -37,8 +37,8 @@ export default function Admin() {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-display text-lg font-bold text-gray-800">
-              <span className="font-accent text-2xl text-se-blue">Sermon</span>{" "}
-              <span className="font-accent text-2xl text-gray-800">Explorer</span>
+              <span className="font-accent text-2xl text-se-green">Sermon</span>{" "}
+              <span className="font-accent text-2xl text-se-blue">Explorer</span>
             </h3>
             <p className="text-gray-500 text-sm">Upload and manage sermons</p>
           </div>
@@ -62,8 +62,8 @@ export default function Admin() {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-display text-lg font-bold text-gray-800">
-              <span className="font-accent text-2xl text-se-blue">Worship</span>{" "}
-              <span className="font-accent text-2xl text-gray-800">Explorer</span>
+              <span className="font-accent text-2xl text-se-green">Worship</span>{" "}
+              <span className="font-accent text-2xl text-se-blue">Explorer</span>
             </h3>
             <p className="text-gray-500 text-sm">Upload and manage educational content</p>
           </div>

@@ -53,8 +53,8 @@ export default function Worship() {
         </button>
         <div>
           <h1 className="font-display font-bold text-gray-800 text-lg">
-            <span className="font-accent text-2xl text-se-blue">Worship</span>{" "}
-            <span className="font-accent text-2xl text-gray-800">Explorer</span>
+            <span className="font-accent text-2xl text-se-green">Worship</span>{" "}
+            <span className="font-accent text-2xl text-se-blue">Explorer</span>
           </h1>
         </div>
       </div>

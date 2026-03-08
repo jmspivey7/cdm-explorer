@@ -111,8 +111,8 @@ export default function WorshipParents() {
         </button>
         <div>
           <h1 className="font-display font-bold text-gray-800 text-lg">
-            <span className="font-accent text-xl text-se-blue">Worship</span>{" "}
-            <span className="font-accent text-xl text-gray-400">Explorer</span>
+            <span className="font-accent text-xl text-se-green">Worship</span>{" "}
+            <span className="font-accent text-xl text-se-blue">Explorer</span>
             <span className="text-gray-400 text-sm ml-2">Parents</span>
           </h1>
         </div>
