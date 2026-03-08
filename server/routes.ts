@@ -201,7 +201,8 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // 2. GET /api/worship/units - returns dynamically built list from worshipUnits
   app.get("/api/worship/units", (_req, res) => {
-    const units = Array.from(worshipUnits.values()).map((unit: any) => ({
+    const units = Array.from(worshipUnits.entries()).map(([id, unit]: [number, any]) => ({
+      id,
       number: unit.number,
       title: unit.title,
       worshipElement: unit.worshipElement,
