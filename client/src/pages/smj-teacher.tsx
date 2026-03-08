@@ -340,8 +340,8 @@ export default function SMJTeacher() {
                               )}
                             </div>
                           ))
-                        ) : aiContent.type === "illustration" && aiContent.ideas ? (
-                          aiContent.ideas.map((idea: any, i: number) => (
+                        ) : aiContent.type === "illustration" && (aiContent.illustrations || aiContent.ideas) ? (
+                          (aiContent.illustrations || aiContent.ideas).map((idea: any, i: number) => (
                             <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                               <p className="font-display font-bold text-amber-800 text-sm mb-1">
                                 {idea.title || `Idea ${i + 1}`}
@@ -352,6 +352,16 @@ export default function SMJTeacher() {
                                 </p>
                               )}
                               <p className="text-amber-900 text-sm">{idea.description || idea.instructions}</p>
+                              {idea.setup && (
+                                <div className="mt-2 text-amber-800 text-sm">
+                                  <span className="font-bold">How to do it:</span>
+                                  <ol className="list-decimal list-inside mt-1 space-y-1">
+                                    {idea.setup.split(/\d+\.\s+/).filter(Boolean).map((step: string, si: number) => (
+                                      <li key={si} className="text-amber-800 text-sm">{step.trim()}</li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
                               {idea.connection && (
                                 <p className="text-amber-600 text-xs italic mt-1">{idea.connection}</p>
                               )}
