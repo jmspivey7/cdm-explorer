@@ -15,6 +15,9 @@ import {
   Lightbulb,
   Volume2,
   Sparkles,
+  Footprints,
+  Shield,
+  Gift,
 } from "lucide-react";
 import type { WorshipElement } from "@shared/curriculum-data";
 
@@ -35,6 +38,9 @@ const ICON_MAP: Record<string, any> = {
   hand: Hand,
   star: Star,
   lightbulb: Lightbulb,
+  footprints: Footprints,
+  shield: Shield,
+  gift: Gift,
 };
 
 export default function ElementExplorer({ childName }: Props) {

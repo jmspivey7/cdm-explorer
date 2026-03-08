@@ -6,7 +6,7 @@ A full-stack application with two modules: **Sermon Explorer** transforms sermon
 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + Framer Motion + CDM Brand
 - **Backend**: Express.js (Node.js) + TypeScript
-- **Database**: PostgreSQL (Neon) via Drizzle ORM + `@neondatabase/serverless`
+- **Database**: PostgreSQL via Drizzle ORM + `pg` (node-postgres driver)
 - **Combined server**: Express serves both the API and the Vite dev middleware on port 5000
 - **AI**: OpenAI GPT-4o for content generation + TTS for narration, Gemini 3 Pro Image (native) for illustrations
 
@@ -41,8 +41,8 @@ script/
 Three tables managed by Drizzle ORM (`shared/schema.ts`):
 
 - **sermons**: id (text PK), title, scripture, summary, key_themes (jsonb), status, raw_text, scenes (jsonb), progress, current_step, error, created_at
-- **worship_units**: id (serial PK), number, title, description, worship_element, created_at
-- **worship_lessons**: id (serial PK), unit_id (FK → worship_units.id, cascade delete), number, title, main_idea, memory_verse, memory_verse_reference, worship_sign, call_and_response (jsonb), activities (jsonb), prayer_focus, song_suggestions (jsonb), pre_generated_quiz (jsonb), lesson_sections (jsonb — structured sections: welcome/bibleTime/talkAndMemorize/sing/makeAndDo/finalFocus), sidebar_meta (jsonb — bibleTruths/scripture/scriptureText/lessonFocus/goalsForChildren/memoryMinute), preparation (text), bible_background (text)
+- **worship_units**: id (serial PK), number, title, description, worship_element, element_spotlight (text — Element of Worship Spotlight teacher dialogue), created_at
+- **worship_lessons**: id (serial PK), unit_id (FK → worship_units.id, cascade delete), number, title, main_idea, memory_verse, memory_verse_reference, worship_sign, call_and_response (jsonb), activities (jsonb), prayer_focus, song_suggestions (jsonb), pre_generated_quiz (jsonb), lesson_sections (jsonb — legacy 6-section format), sidebar_meta (jsonb — legacy sidebar), preparation (text), bible_background (text), element_sections (jsonb — worship element-based sections: callToWorship/prayer/praise/readingTheWord/walkingInTheWord/confessionOfSin/assuranceOfPardon/confessionOfFaith/sacraments/tithesAndOfferings/benediction), element_sidebar_meta (jsonb — scripture/scriptureText/lessonFocus/goalsForChildren/memoryVerse/memoryVerseReference/worshipSign/bibleTruth)
 
 Upload progress is kept in an in-memory Map (transient processing state only).
 
@@ -103,11 +103,13 @@ Upload progress is kept in an in-memory Map (transient processing state only).
 
 ## Teacher Lesson Plan View
 
-The teacher view (`worship-teacher.tsx`) renders lesson plans in a two-column layout:
-- **Main content (left 2/3)**: Preparation, Bible Background, then six expandable lesson section cards (Welcome, Bible Time, Talk and Memorize, Sing, Make and Do, Final Focus) each with content, instructions, and materials
-- **Sidebar (right 1/3)**: Scripture, Lesson Focus, Bible Truths, Goals for Children, Memory Minute
-- Falls back gracefully for lessons uploaded before the structured format was added (shows flat mainIdea/activities/etc.)
-- AI extraction prompt is optimized for the "Exploring the Elements of Worship" curriculum format
+The teacher view (`worship-teacher.tsx`) renders lesson plans in a two-column layout based on the "Exploring the Elements of Worship" curriculum format:
+- **Main content (left 2/3)**: Preparation, Bible Background, then expandable worship element cards (Call to Worship, Prayer, Praise, Reading the Word, Walking in the Word, Confession of Sin, Assurance of Pardon, Confession of Faith, Sacraments, Tithes & Offerings, Benediction). Core elements are labeled. Each card can include teacher scripts (formatted in blue), content, materials, and numbered instructions.
+- **Sidebar (right 1/3)**: Scripture, Lesson Focus, Bible Truth, Goals for Children, Memory Verse (with TTS), Worship Sign
+- **Unit overview** shows the Element of Worship Spotlight dialogue (a teacher script introducing the unit's focus element to children)
+- Three fallback tiers: (1) element-based sections (new format), (2) legacy 6-section format, (3) flat legacy fields
+- AI extraction prompt understands modular worship-element structure — each element has its own section page in the curriculum
+- The `WORSHIP_ELEMENTS` constant in `curriculum-data.ts` defines 11 elements with icons, colors, child-friendly explanations, hand motions, and core/non-core flags
 
 ## Image Generation (Gemini Native)
 

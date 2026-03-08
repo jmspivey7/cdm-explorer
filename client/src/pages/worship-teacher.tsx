@@ -12,19 +12,35 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
-  HandHeart,
-  BookOpenCheck,
-  MessageSquare,
-  Music,
-  Scissors,
-  Star,
+  Clock,
   ScrollText,
+  Megaphone,
+  HandHeart,
+  Music,
+  BookOpenCheck,
+  Footprints,
+  HeartCrack,
+  Sun,
+  Shield,
+  Droplets,
+  Gift,
+  Hand,
+  type LucideIcon,
+  Bookmark,
   Target,
   Heart,
   GraduationCap,
-  Clock,
+  Star,
 } from "lucide-react";
-import type { LessonSections, SidebarMeta, LessonSectionData } from "@shared/schema";
+import type {
+  WorshipElementSections,
+  WorshipElementKey,
+  ElementSectionData,
+  LessonSidebarMeta,
+  LessonSections,
+  LessonSectionData,
+  SidebarMeta,
+} from "@shared/schema";
 
 interface Lesson {
   id: number;
@@ -42,6 +58,8 @@ interface Lesson {
   sidebarMeta?: SidebarMeta | null;
   preparation?: string;
   bibleBackground?: string;
+  elementSections?: WorshipElementSections | null;
+  elementSidebarMeta?: LessonSidebarMeta | null;
 }
 
 interface UnitDetail {
@@ -50,21 +68,38 @@ interface UnitDetail {
   title: string;
   description: string;
   worshipElement: string;
+  elementSpotlight?: string;
   lessons: Lesson[];
 }
 
 type AssistantRequestType = "discussion" | "illustration" | "activity";
 
-const SECTION_CONFIG = [
-  { key: "welcome" as const, label: "Welcome", icon: HandHeart, iconBg: "bg-se-green/10", iconText: "text-se-green", numBg: "bg-se-green/10", numText: "text-se-green" },
-  { key: "bibleTime" as const, label: "Bible Time", icon: BookOpenCheck, iconBg: "bg-se-blue/10", iconText: "text-se-blue", numBg: "bg-se-blue/10", numText: "text-se-blue" },
-  { key: "talkAndMemorize" as const, label: "Talk and Memorize", icon: MessageSquare, iconBg: "bg-se-purple/10", iconText: "text-se-purple", numBg: "bg-se-purple/10", numText: "text-se-purple" },
-  { key: "sing" as const, label: "Sing", icon: Music, iconBg: "bg-se-blue/10", iconText: "text-se-blue", numBg: "bg-se-blue/10", numText: "text-se-blue" },
-  { key: "makeAndDo" as const, label: "Make and Do", icon: Scissors, iconBg: "bg-se-green/10", iconText: "text-se-green", numBg: "bg-se-green/10", numText: "text-se-green" },
-  { key: "finalFocus" as const, label: "Final Focus", icon: Star, iconBg: "bg-se-purple/10", iconText: "text-se-purple", numBg: "bg-se-purple/10", numText: "text-se-purple" },
+interface ElementConfig {
+  key: WorshipElementKey;
+  label: string;
+  icon: LucideIcon;
+  iconBg: string;
+  iconText: string;
+  numBg: string;
+  numText: string;
+  core: boolean;
+}
+
+const ELEMENT_CONFIG: ElementConfig[] = [
+  { key: "callToWorship", label: "Call to Worship", icon: Megaphone, iconBg: "bg-emerald-100", iconText: "text-emerald-600", numBg: "bg-emerald-100", numText: "text-emerald-700", core: true },
+  { key: "prayer", label: "Prayer", icon: HandHeart, iconBg: "bg-amber-100", iconText: "text-amber-600", numBg: "bg-amber-100", numText: "text-amber-700", core: true },
+  { key: "praise", label: "Praise", icon: Music, iconBg: "bg-sky-100", iconText: "text-sky-600", numBg: "bg-sky-100", numText: "text-sky-700", core: true },
+  { key: "readingTheWord", label: "Reading the Word", icon: BookOpenCheck, iconBg: "bg-red-100", iconText: "text-red-500", numBg: "bg-red-100", numText: "text-red-600", core: true },
+  { key: "walkingInTheWord", label: "Walking in the Word", icon: Footprints, iconBg: "bg-green-100", iconText: "text-green-600", numBg: "bg-green-100", numText: "text-green-700", core: true },
+  { key: "confessionOfSin", label: "Confession of Sin", icon: HeartCrack, iconBg: "bg-purple-100", iconText: "text-purple-600", numBg: "bg-purple-100", numText: "text-purple-700", core: false },
+  { key: "assuranceOfPardon", label: "Assurance of Pardon", icon: Sun, iconBg: "bg-orange-100", iconText: "text-orange-500", numBg: "bg-orange-100", numText: "text-orange-600", core: false },
+  { key: "confessionOfFaith", label: "Confession of Faith", icon: Shield, iconBg: "bg-rose-100", iconText: "text-rose-500", numBg: "bg-rose-100", numText: "text-rose-600", core: false },
+  { key: "sacraments", label: "Sacraments", icon: Droplets, iconBg: "bg-cyan-100", iconText: "text-cyan-600", numBg: "bg-cyan-100", numText: "text-cyan-700", core: false },
+  { key: "tithesAndOfferings", label: "Tithes & Offerings", icon: Gift, iconBg: "bg-yellow-100", iconText: "text-yellow-600", numBg: "bg-yellow-100", numText: "text-yellow-700", core: false },
+  { key: "benediction", label: "Benediction / Closing", icon: Hand, iconBg: "bg-pink-100", iconText: "text-pink-500", numBg: "bg-pink-100", numText: "text-pink-600", core: false },
 ];
 
-function LessonSectionCard({ config, section }: { config: typeof SECTION_CONFIG[number]; section: LessonSectionData }) {
+function ElementSectionCard({ config, section }: { config: ElementConfig; section: ElementSectionData }) {
   const [expanded, setExpanded] = useState(false);
   const IconComp = config.icon;
 
@@ -80,6 +115,11 @@ function LessonSectionCard({ config, section }: { config: typeof SECTION_CONFIG[
         <span className="font-display font-bold text-gray-800 flex-1 text-left">
           {section.title || config.label}
         </span>
+        {config.core && (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">
+            Core
+          </span>
+        )}
         {expanded ? (
           <ChevronDown className="w-4 h-4 text-gray-400" />
         ) : (
@@ -97,8 +137,17 @@ function LessonSectionCard({ config, section }: { config: typeof SECTION_CONFIG[
             className="overflow-hidden"
           >
             <div className="px-5 pb-5 space-y-3">
+              {section.teacherScript && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">Teacher Script</p>
+                  <div className="text-blue-900 text-sm leading-relaxed whitespace-pre-line">
+                    {section.teacherScript}
+                  </div>
+                </div>
+              )}
+
               {section.content && (
-                <p className="text-gray-600 text-sm leading-relaxed">{section.content}</p>
+                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{section.content}</p>
               )}
 
               {section.materials && section.materials.length > 0 && (
@@ -138,6 +187,15 @@ function LessonSectionCard({ config, section }: { config: typeof SECTION_CONFIG[
   );
 }
 
+function hasContent(section: ElementSectionData | null | undefined): section is ElementSectionData {
+  if (!section) return false;
+  return !!(
+    section.content?.trim() ||
+    section.teacherScript?.trim() ||
+    (section.instructions && section.instructions.length > 0)
+  );
+}
+
 export default function WorshipTeacher() {
   const [, setLocation] = useLocation();
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
@@ -171,10 +229,15 @@ export default function WorshipTeacher() {
 
   const selectedLesson = unit?.lessons.find((l) => l.id === selectedLessonId);
 
-  const hasStructuredSections = selectedLesson?.lessonSections &&
+  const hasElementSections = selectedLesson?.elementSections &&
+    Object.values(selectedLesson.elementSections).some(hasContent);
+
+  const hasOldStructuredSections = !hasElementSections && selectedLesson?.lessonSections &&
     Object.values(selectedLesson.lessonSections).some(
       (s) => s !== null && s !== undefined && (s.content?.trim() || (s.instructions && s.instructions.length > 0))
     );
+
+  const sidebar = selectedLesson?.elementSidebarMeta || null;
 
   async function handleAiAssistant(type: AssistantRequestType) {
     if (!selectedLessonId) return;
@@ -301,10 +364,27 @@ export default function WorshipTeacher() {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white border border-gray-200 rounded-2xl p-6"
                   >
-                    <h2 className="font-display font-bold text-gray-800 mb-4">
+                    <h2 className="font-display font-bold text-gray-800 mb-1">
                       {unit.title}
                     </h2>
-                    <p className="text-gray-600 text-sm mb-6">{unit.description}</p>
+                    {unit.worshipElement && (
+                      <p className="text-se-blue font-display font-bold text-sm mb-3">
+                        Element: {unit.worshipElement}
+                      </p>
+                    )}
+                    <p className="text-gray-600 text-sm mb-4">{unit.description}</p>
+
+                    {unit.elementSpotlight && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                        <h3 className="font-display font-bold text-blue-800 text-sm mb-2 flex items-center gap-2">
+                          <Star className="w-4 h-4 text-blue-600" />
+                          Element of Worship Spotlight
+                        </h3>
+                        <p className="text-blue-900 text-sm leading-relaxed whitespace-pre-line">
+                          {unit.elementSpotlight}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       {unit.lessons.map((lesson) => (
@@ -345,9 +425,12 @@ export default function WorshipTeacher() {
                         Back to Lessons
                       </button>
 
-                      <h2 className="font-display font-bold text-2xl text-gray-800 mb-6">
+                      <h2 className="font-display font-bold text-2xl text-gray-800 mb-1">
                         {selectedLesson.title}
                       </h2>
+                      {selectedLesson.mainIdea && (
+                        <p className="text-gray-500 text-sm mb-6">{selectedLesson.mainIdea}</p>
+                      )}
 
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 space-y-4">
@@ -371,16 +454,16 @@ export default function WorshipTeacher() {
                             </div>
                           )}
 
-                          {hasStructuredSections ? (
+                          {hasElementSections ? (
                             <div className="space-y-3">
                               <h3 className="font-display font-bold text-gray-500 text-xs uppercase tracking-wider px-1">
-                                Lesson Sections
+                                Elements of Worship
                               </h3>
-                              {SECTION_CONFIG.map((config) => {
-                                const section = selectedLesson.lessonSections?.[config.key];
-                                if (!section || (!section.content?.trim() && (!section.instructions || section.instructions.length === 0))) return null;
+                              {ELEMENT_CONFIG.map((config) => {
+                                const section = selectedLesson.elementSections?.[config.key];
+                                if (!hasContent(section)) return null;
                                 return (
-                                  <LessonSectionCard
+                                  <ElementSectionCard
                                     key={config.key}
                                     config={config}
                                     section={section}
@@ -388,13 +471,34 @@ export default function WorshipTeacher() {
                                 );
                               })}
                             </div>
+                          ) : hasOldStructuredSections ? (
+                            <div className="space-y-3">
+                              <h3 className="font-display font-bold text-gray-500 text-xs uppercase tracking-wider px-1">
+                                Lesson Sections
+                              </h3>
+                              <p className="text-gray-400 text-xs px-1">This lesson uses the older format. Re-upload to get element-based sections.</p>
+                              {selectedLesson.lessonSections && (Object.entries(selectedLesson.lessonSections) as [string, LessonSectionData | null][]).map(([key, section]) => {
+                                if (!section || (!section.content?.trim() && (!section.instructions || section.instructions.length === 0))) return null;
+                                return (
+                                  <div key={key} className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h4 className="font-display font-bold text-gray-700 mb-2">{section.title || key}</h4>
+                                    {section.content && <p className="text-gray-600 text-sm">{section.content}</p>}
+                                    {section.instructions && section.instructions.length > 0 && (
+                                      <ul className="mt-2 space-y-1">
+                                        {section.instructions.map((inst: string, i: number) => (
+                                          <li key={i} className="text-gray-600 text-sm flex gap-2">
+                                            <span className="text-se-blue font-bold text-xs">{i + 1}.</span>
+                                            <span>{inst}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           ) : (
                             <div className="space-y-4">
-                              <div className="bg-white border border-gray-200 rounded-2xl p-5">
-                                <h3 className="font-display font-bold text-gray-700 mb-2">Main Idea</h3>
-                                <p className="text-gray-600 text-sm">{selectedLesson.mainIdea}</p>
-                              </div>
-
                               {selectedLesson.memoryVerse && (
                                 <div className="bg-white border-2 border-se-green/30 rounded-2xl p-5">
                                   <div className="flex items-start gap-3 mb-2">
@@ -420,8 +524,8 @@ export default function WorshipTeacher() {
                               )}
 
                               {selectedLesson.callAndResponse && (
-                                <div className="bg-white border-2 border-se-purple/30 rounded-2xl p-5">
-                                  <h3 className="font-display font-bold text-se-purple mb-3">Call & Response</h3>
+                                <div className="bg-white border-2 border-purple-300 rounded-2xl p-5">
+                                  <h3 className="font-display font-bold text-purple-700 mb-3">Call & Response</h3>
                                   <div className="space-y-2">
                                     <div>
                                       <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Leader</p>
@@ -501,83 +605,53 @@ export default function WorshipTeacher() {
                             <AnimatePresence mode="wait">
                               {aiContent && (
                                 <motion.div
-                                  initial={{ opacity: 0, y: 10 }}
+                                  key={activeAiType}
+                                  initial={{ opacity: 0, y: 5 }}
                                   animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  className="bg-white rounded-xl p-4 border border-se-blue/20"
+                                  exit={{ opacity: 0, y: -5 }}
+                                  className="bg-white rounded-xl border border-se-blue/20 p-4"
                                 >
                                   {aiContent.error ? (
                                     <p className="text-red-500 text-sm">{aiContent.error}</p>
-                                  ) : aiContent.type === "discussion" && aiContent.questions ? (
-                                    <div className="space-y-4">
-                                      {aiContent.questions.map((q: any, idx: number) => (
-                                        <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                                          <p className="font-display font-bold text-gray-800 text-sm mb-1">
-                                            {idx + 1}. {q.question}
-                                          </p>
-                                          {q.followUp && (
-                                            <p className="text-gray-500 text-xs ml-4 mb-1">
-                                              <span className="font-semibold">Follow-up:</span> {q.followUp}
-                                            </p>
-                                          )}
-                                          {q.connection && (
-                                            <p className="text-se-blue text-xs ml-4">
-                                              <span className="font-semibold">Connection:</span> {q.connection}
-                                            </p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : aiContent.type === "illustration" && aiContent.illustrations ? (
-                                    <div className="space-y-4">
-                                      {aiContent.illustrations.map((ill: any, idx: number) => (
-                                        <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                                          <p className="font-display font-bold text-gray-800 text-sm mb-1">
-                                            {ill.title}
-                                          </p>
-                                          {ill.materials && ill.materials.length > 0 && (
-                                            <p className="text-gray-500 text-xs mb-1">
-                                              <span className="font-semibold">Materials:</span> {ill.materials.join(", ")}
-                                            </p>
-                                          )}
-                                          <p className="text-gray-600 text-sm mb-1">{ill.description}</p>
-                                          {ill.connection && (
-                                            <p className="text-se-blue text-xs">
-                                              <span className="font-semibold">Worship connection:</span> {ill.connection}
-                                            </p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : aiContent.type === "activity" && aiContent.activities ? (
-                                    <div className="space-y-4">
-                                      {aiContent.activities.map((act: any, idx: number) => (
-                                        <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                                          <p className="font-display font-bold text-gray-800 text-sm mb-1">
-                                            {act.title}
-                                            {act.duration && (
-                                              <span className="text-gray-400 font-normal ml-2">({act.duration})</span>
-                                            )}
-                                          </p>
-                                          {act.materials && act.materials.length > 0 && (
-                                            <p className="text-gray-500 text-xs mb-1">
-                                              <span className="font-semibold">Materials:</span> {act.materials.join(", ")}
-                                            </p>
-                                          )}
-                                          <p className="text-gray-600 text-sm mb-1">{act.instructions}</p>
-                                          {act.worshipConnection && (
-                                            <p className="text-se-blue text-xs">
-                                              <span className="font-semibold">Worship connection:</span> {act.worshipConnection}
-                                            </p>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
                                   ) : (
-                                    <div className="text-gray-700 text-sm prose prose-sm max-w-none">
-                                      <pre className="whitespace-pre-wrap font-sans">
-                                        {JSON.stringify(aiContent, null, 2)}
-                                      </pre>
+                                    <div className="space-y-3">
+                                      {aiContent.type === "discussion" && aiContent.questions && (
+                                        <>
+                                          <h4 className="font-display font-bold text-gray-700 text-sm">Discussion Questions</h4>
+                                          <ol className="space-y-2">
+                                            {aiContent.questions.map((q: string, i: number) => (
+                                              <li key={i} className="text-gray-600 text-sm flex gap-2">
+                                                <span className="text-se-blue font-bold">{i + 1}.</span>
+                                                <span>{q}</span>
+                                              </li>
+                                            ))}
+                                          </ol>
+                                        </>
+                                      )}
+                                      {aiContent.type === "illustration" && aiContent.illustrations && (
+                                        <>
+                                          <h4 className="font-display font-bold text-gray-700 text-sm">Object Lessons</h4>
+                                          {aiContent.illustrations.map((ill: any, i: number) => (
+                                            <div key={i} className="border-l-2 border-se-blue/30 pl-3">
+                                              <p className="font-display font-bold text-gray-700 text-sm">{ill.title || `Illustration ${i + 1}`}</p>
+                                              <p className="text-gray-600 text-sm mt-1">{ill.description || ill}</p>
+                                              {ill.materials && <p className="text-gray-400 text-xs mt-1">Materials: {ill.materials}</p>}
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
+                                      {aiContent.type === "activity" && aiContent.activities && (
+                                        <>
+                                          <h4 className="font-display font-bold text-gray-700 text-sm">Extra Activities</h4>
+                                          {aiContent.activities.map((act: any, i: number) => (
+                                            <div key={i} className="border-l-2 border-se-green/30 pl-3">
+                                              <p className="font-display font-bold text-gray-700 text-sm">{act.title || `Activity ${i + 1}`}</p>
+                                              <p className="text-gray-600 text-sm mt-1">{act.description || act}</p>
+                                              {act.materials && <p className="text-gray-400 text-xs mt-1">Materials: {act.materials}</p>}
+                                            </div>
+                                          ))}
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </motion.div>
@@ -586,125 +660,116 @@ export default function WorshipTeacher() {
                           </div>
                         </div>
 
-                        <div className="lg:col-span-1 space-y-4">
+                        <div className="lg:col-span-1">
                           <div className="sticky top-20 space-y-4">
-                            {selectedLesson.sidebarMeta ? (
+                            {sidebar ? (
                               <>
-                                {selectedLesson.sidebarMeta.scripture && (
-                                  <div className="bg-white border-2 border-se-blue/20 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
+                                {sidebar.scripture && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">
                                       <BookOpen className="w-4 h-4 text-se-blue" />
-                                      <h4 className="font-display font-bold text-se-blue text-sm">Scripture</h4>
-                                    </div>
-                                    <p className="font-display font-bold text-gray-800 text-sm mb-1">
-                                      {selectedLesson.sidebarMeta.scripture}
-                                    </p>
-                                    {selectedLesson.sidebarMeta.scriptureText && (
-                                      <p className="text-gray-600 text-xs italic leading-relaxed">
-                                        {selectedLesson.sidebarMeta.scriptureText}
-                                      </p>
+                                      Scripture
+                                    </h3>
+                                    <p className="text-se-blue font-display font-bold text-sm">{sidebar.scripture}</p>
+                                    {sidebar.scriptureText && (
+                                      <p className="text-gray-600 text-sm italic mt-2 leading-relaxed">{sidebar.scriptureText}</p>
                                     )}
                                   </div>
                                 )}
 
-                                {selectedLesson.sidebarMeta.lessonFocus && (
-                                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
+                                {sidebar.lessonFocus && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">
                                       <Target className="w-4 h-4 text-se-green" />
-                                      <h4 className="font-display font-bold text-se-green text-sm">Lesson Focus</h4>
-                                    </div>
-                                    <p className="text-gray-700 text-sm leading-relaxed">
-                                      {selectedLesson.sidebarMeta.lessonFocus}
-                                    </p>
+                                      Lesson Focus
+                                    </h3>
+                                    <p className="text-gray-600 text-sm">{sidebar.lessonFocus}</p>
                                   </div>
                                 )}
 
-                                {selectedLesson.sidebarMeta.bibleTruths && (
-                                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Heart className="w-4 h-4 text-se-purple" />
-                                      <h4 className="font-display font-bold text-se-purple text-sm">Bible Truths</h4>
-                                    </div>
-                                    <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                                      {selectedLesson.sidebarMeta.bibleTruths}
-                                    </p>
+                                {sidebar.bibleTruth && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                                      <Heart className="w-4 h-4 text-red-400" />
+                                      Bible Truth
+                                    </h3>
+                                    <p className="text-gray-600 text-sm">{sidebar.bibleTruth}</p>
                                   </div>
                                 )}
 
-                                {selectedLesson.sidebarMeta.goalsForChildren && (
-                                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <GraduationCap className="w-4 h-4 text-se-blue" />
-                                      <h4 className="font-display font-bold text-se-blue text-sm">Goals for Children</h4>
-                                    </div>
-                                    <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                                      {selectedLesson.sidebarMeta.goalsForChildren}
-                                    </p>
+                                {sidebar.goalsForChildren && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                                      <GraduationCap className="w-4 h-4 text-purple-500" />
+                                      Goals for Children
+                                    </h3>
+                                    <p className="text-gray-600 text-sm">{sidebar.goalsForChildren}</p>
                                   </div>
                                 )}
 
-                                {selectedLesson.sidebarMeta.memoryMinute && (
-                                  <div className="bg-se-green/5 border-2 border-se-green/20 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Volume2 className="w-4 h-4 text-se-green" />
-                                      <h4 className="font-display font-bold text-se-green text-sm">Memory Minute</h4>
+                                {(sidebar.memoryVerse || selectedLesson.memoryVerse) && (
+                                  <div className="bg-white border-2 border-se-green/30 rounded-2xl p-5">
+                                    <div className="flex items-start gap-2 mb-2">
+                                      <h3 className="font-display font-bold text-se-green text-sm flex items-center gap-2">
+                                        <Bookmark className="w-4 h-4" />
+                                        Memory Verse
+                                      </h3>
+                                      <button
+                                        onClick={() => speakText(sidebar.memoryVerse || selectedLesson.memoryVerse)}
+                                        className="p-1 hover:bg-se-green/10 rounded-lg transition-colors"
+                                        title="Hear verse"
+                                      >
+                                        <Volume2 className="w-3.5 h-3.5 text-se-green" />
+                                      </button>
                                     </div>
-                                    <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                                      {selectedLesson.sidebarMeta.memoryMinute}
-                                    </p>
-                                    {selectedLesson.memoryVerse && (
-                                      <div className="mt-3 pt-3 border-t border-se-green/20">
-                                        <p className="text-gray-800 text-sm italic">{selectedLesson.memoryVerse}</p>
-                                        <p className="text-gray-500 text-xs mt-1">{selectedLesson.memoryVerseReference}</p>
-                                        <button
-                                          onClick={() => speakText(selectedLesson.memoryVerse)}
-                                          className="mt-2 p-1.5 hover:bg-se-green/10 rounded-lg transition-colors"
-                                          title="Hear verse"
-                                        >
-                                          <Volume2 className="w-4 h-4 text-se-green" />
-                                        </button>
-                                      </div>
-                                    )}
+                                    <p className="text-gray-700 italic text-sm">{sidebar.memoryVerse || selectedLesson.memoryVerse}</p>
+                                    <p className="text-gray-400 text-xs mt-1">{sidebar.memoryVerseReference || selectedLesson.memoryVerseReference}</p>
+                                  </div>
+                                )}
+
+                                {(sidebar.worshipSign || selectedLesson.worshipSign) && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">
+                                      <Hand className="w-4 h-4 text-amber-500" />
+                                      Worship Sign
+                                    </h3>
+                                    <p className="text-gray-600 text-sm">{sidebar.worshipSign || selectedLesson.worshipSign}</p>
                                   </div>
                                 )}
                               </>
                             ) : (
                               <>
                                 {selectedLesson.memoryVerse && (
-                                  <div className="bg-se-green/5 border-2 border-se-green/20 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Volume2 className="w-4 h-4 text-se-green" />
-                                      <h4 className="font-display font-bold text-se-green text-sm">Memory Verse</h4>
+                                  <div className="bg-white border-2 border-se-green/30 rounded-2xl p-5">
+                                    <div className="flex items-start gap-2 mb-2">
+                                      <h3 className="font-display font-bold text-se-green text-sm flex items-center gap-2">
+                                        <Bookmark className="w-4 h-4" />
+                                        Memory Verse
+                                      </h3>
+                                      <button
+                                        onClick={() => speakText(selectedLesson.memoryVerse)}
+                                        className="p-1 hover:bg-se-green/10 rounded-lg transition-colors"
+                                        title="Hear verse"
+                                      >
+                                        <Volume2 className="w-3.5 h-3.5 text-se-green" />
+                                      </button>
                                     </div>
-                                    <p className="text-gray-800 text-sm italic">{selectedLesson.memoryVerse}</p>
-                                    <p className="text-gray-500 text-xs mt-1">{selectedLesson.memoryVerseReference}</p>
-                                    <button
-                                      onClick={() => speakText(selectedLesson.memoryVerse)}
-                                      className="mt-2 p-1.5 hover:bg-se-green/10 rounded-lg transition-colors"
-                                      title="Hear verse"
-                                    >
-                                      <Volume2 className="w-4 h-4 text-se-green" />
-                                    </button>
+                                    <p className="text-gray-700 italic text-sm">{selectedLesson.memoryVerse}</p>
+                                    <p className="text-gray-400 text-xs mt-1">{selectedLesson.memoryVerseReference}</p>
                                   </div>
                                 )}
 
-                                {selectedLesson.mainIdea && (
-                                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Target className="w-4 h-4 text-se-green" />
-                                      <h4 className="font-display font-bold text-se-green text-sm">Main Idea</h4>
-                                    </div>
-                                    <p className="text-gray-700 text-sm">{selectedLesson.mainIdea}</p>
+                                {selectedLesson.worshipSign && (
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2">Worship Sign</h3>
+                                    <p className="text-gray-600 text-sm">{selectedLesson.worshipSign}</p>
                                   </div>
                                 )}
 
                                 {selectedLesson.prayerFocus && (
-                                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Heart className="w-4 h-4 text-se-purple" />
-                                      <h4 className="font-display font-bold text-se-purple text-sm">Prayer Focus</h4>
-                                    </div>
-                                    <p className="text-gray-700 text-sm">{selectedLesson.prayerFocus}</p>
+                                  <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                                    <h3 className="font-display font-bold text-gray-700 text-sm mb-2">Prayer Focus</h3>
+                                    <p className="text-gray-600 text-sm">{selectedLesson.prayerFocus}</p>
                                   </div>
                                 )}
                               </>
@@ -717,7 +782,7 @@ export default function WorshipTeacher() {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-96">
+              <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
               </div>
             )}

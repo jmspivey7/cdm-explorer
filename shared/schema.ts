@@ -21,8 +21,44 @@ export const worshipUnits = pgTable("worship_units", {
   title: text("title").notNull(),
   description: text("description").default(""),
   worshipElement: text("worship_element").default(""),
+  elementSpotlight: text("element_spotlight").default(""),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export interface ElementSectionData {
+  title: string;
+  content: string;
+  instructions: string[];
+  materials?: string[];
+  teacherScript?: string;
+}
+
+export interface WorshipElementSections {
+  callToWorship: ElementSectionData | null;
+  prayer: ElementSectionData | null;
+  praise: ElementSectionData | null;
+  readingTheWord: ElementSectionData | null;
+  walkingInTheWord: ElementSectionData | null;
+  confessionOfSin: ElementSectionData | null;
+  assuranceOfPardon: ElementSectionData | null;
+  confessionOfFaith: ElementSectionData | null;
+  sacraments: ElementSectionData | null;
+  tithesAndOfferings: ElementSectionData | null;
+  benediction: ElementSectionData | null;
+}
+
+export type WorshipElementKey = keyof WorshipElementSections;
+
+export interface LessonSidebarMeta {
+  scripture: string;
+  scriptureText: string;
+  lessonFocus: string;
+  goalsForChildren: string;
+  memoryVerse: string;
+  memoryVerseReference: string;
+  worshipSign: string;
+  bibleTruth: string;
+}
 
 export interface LessonSectionData {
   title: string;
@@ -67,4 +103,6 @@ export const worshipLessons = pgTable("worship_lessons", {
   sidebarMeta: jsonb("sidebar_meta").$type<SidebarMeta | null>(),
   preparation: text("preparation").default(""),
   bibleBackground: text("bible_background").default(""),
+  elementSections: jsonb("element_sections").$type<WorshipElementSections | null>(),
+  elementSidebarMeta: jsonb("element_sidebar_meta").$type<LessonSidebarMeta | null>(),
 });

@@ -268,6 +268,8 @@ export async function registerRoutes(server: Server, app: Express) {
           sidebarMeta: l.sidebarMeta,
           preparation: l.preparation,
           bibleBackground: l.bibleBackground,
+          elementSections: l.elementSections,
+          elementSidebarMeta: l.elementSidebarMeta,
         })),
       });
     } catch (err: any) {
@@ -1108,16 +1110,34 @@ Write the story as natural narrative prose, not Q&A or lesson plan format.`,
 }
 
 async function generateParentGuide(lesson: LessonData) {
+  const worshipElements: string[] = [];
+  if (lesson.elementSections) {
+    const elementNames: Record<string, string> = {
+      callToWorship: "Call to Worship", prayer: "Prayer", praise: "Praise",
+      readingTheWord: "Reading the Word", walkingInTheWord: "Walking in the Word",
+      confessionOfSin: "Confession of Sin", assuranceOfPardon: "Assurance of Pardon",
+      confessionOfFaith: "Confession of Faith", sacraments: "Sacraments",
+      tithesAndOfferings: "Tithes & Offerings", benediction: "Benediction",
+    };
+    for (const [key, section] of Object.entries(lesson.elementSections)) {
+      if (section && (section.content || section.teacherScript)) {
+        worshipElements.push(elementNames[key] || key);
+      }
+    }
+  }
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: `You are a Sunday school curriculum writer creating an at-home guide for parents. Based on the lesson content, create a family activity guide that:
-- Summarizes what the child learned in 2-3 simple sentences
+        content: `You are a Sunday school curriculum writer creating an at-home guide for parents. The curriculum teaches children about the elements of corporate worship (Call to Worship, Prayer, Praise, Reading the Word, etc.).
+
+Based on the lesson content, create a family activity guide that:
+- Summarizes what the child learned in 2-3 simple sentences, mentioning the specific worship elements covered
 - Provides 2-3 ways to practice the memory verse at home
-- Lists 3 concrete family activities (5-15 min each) with materials and instructions
-- Gives 3-4 dinner table discussion starters
+- Lists 3 concrete family activities (5-15 min each) with materials and instructions, connecting them to the worship elements the child learned
+- Gives 3-4 dinner table discussion starters about worship and the Bible story
 - Includes a prayer focus with example words the parent can say
 
 Respond with JSON:
@@ -1136,6 +1156,8 @@ Lesson: ${lesson.title}
 Main Idea: ${lesson.mainIdea}
 Memory Verse: "${lesson.memoryVerse}" (${lesson.memoryVerseReference})
 Prayer Focus: ${lesson.prayerFocus}
+${lesson.worshipSign ? `Worship Sign: ${lesson.worshipSign}` : ""}
+${worshipElements.length > 0 ? `Worship Elements Covered: ${worshipElements.join(", ")}` : ""}
 ${lesson.songSuggestions && lesson.songSuggestions.length > 0 ? `Suggested Songs: ${lesson.songSuggestions.join(", ")}` : ""}
       `.trim(),
       },
@@ -1162,22 +1184,28 @@ async function processWorshipCurriculum(uploadId: string, text: string) {
     messages: [
       {
         role: "system",
-        content: `You are analyzing a children's worship curriculum document. Identify the high-level structure.
+        content: `You are analyzing a children's worship curriculum document from "Exploring the Elements of Worship" by Teach Us to Worship / PCA CDM.
+
+This curriculum is organized by units, each focused on a specific element of corporate worship. The 11 elements are: Call to Worship, Prayer, Praise, Reading the Word, Walking in the Word, Confession of Sin, Assurance of Pardon, Confession of Faith, Sacraments, Tithes & Offerings, Benediction. Unit 1 ("We Gather to Worship") is introductory.
+
+Each unit has 4 lessons and an "Element of Worship Spotlight" — an introductory dialogue/script that teaches children about the unit's focus element (e.g., explaining what "Call to Worship" means, with hand motions and interactive dialogue).
 
 Extract:
-- unitTitle: The overall unit or curriculum title
-- worshipElement: Which element of worship this unit covers (e.g., "Call to Worship", "Prayer", etc.)
+- unitTitle: The unit title (e.g., "Call to Worship" or "We Gather to Worship")
+- worshipElement: Which element of worship this unit covers (must be one of the 11 listed above, or "We Gather to Worship" for intro unit)
 - unitDescription: A 1-2 sentence description of what this unit teaches
 - lessonCount: How many individual lessons are in this document
 - lessonTitles: Array of lesson titles found
+- elementSpotlight: The full "Element of Worship Spotlight" teacher dialogue/script that introduces the element to children. Include all teacher words and instructions. If not found, use empty string.
 
 Respond with JSON:
 {
   "unitTitle": "...",
   "worshipElement": "...",
   "unitDescription": "...",
-  "lessonCount": 1,
-  "lessonTitles": ["..."]
+  "lessonCount": 4,
+  "lessonTitles": ["..."],
+  "elementSpotlight": "..."
 }`,
       },
       { role: "user", content: text.substring(0, 12000) },
@@ -1188,62 +1216,77 @@ Respond with JSON:
 
   const structure = JSON.parse(structureResponse.choices[0].message.content || '{}');
 
-  // Step 2: Extract detailed lesson data with structured sections
+  // Step 2: Extract detailed lesson data with element-based sections
   updateUploadProgress("Extracting lesson content...", 30);
   const lessonsResponse = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: `You are parsing a children's worship curriculum document from the "Exploring the Elements of Worship" series. Extract ALL lesson data with maximum detail.
+        content: `You are parsing a children's worship curriculum document from "Exploring the Elements of Worship" by Teach Us to Worship / PCA CDM. Extract ALL lesson data with maximum detail.
 
-This curriculum format has a consistent structure. For each lesson found, extract:
+This curriculum organizes each lesson around the ELEMENTS OF CORPORATE WORSHIP. Each lesson incorporates multiple worship elements (Call to Worship, Prayer, Praise, Reading the Word, Walking in the Word, Confession of Sin, Assurance of Pardon, Confession of Faith, Sacraments, Tithes & Offerings, Benediction/Closing). Not every element appears in every lesson. Each element section has its own page or section in the document.
+
+For each lesson found, extract:
 
 BASIC FIELDS:
-- title: The lesson title (e.g., "Jesus Heals Ten Lepers")
-- mainIdea: The main teaching point (1-2 sentences)
-- memoryVerse: The exact memory verse text (look for "Memory Minute" section)
-- memoryVerseReference: The Bible verse reference (e.g., "Luke 17:11-19")
-- worshipSign: Any worship sign, hand motion, or physical gesture described
-- callAndResponse: If leader/response elements exist, extract as {leader: "...", response: "..."}. If none, use null.
-- prayerFocus: The prayer focus or closing prayer text
+- title: The lesson title (e.g., "God Is the Creator")
+- mainIdea: The main teaching point or Bible truth (1-2 sentences)
+- memoryVerse: The exact memory verse text
+- memoryVerseReference: The Bible verse reference (e.g., "Genesis 1:1")
+- worshipSign: Any worship sign, hand motion, or physical gesture described for this lesson or the unit's element
+- callAndResponse: If leader/response liturgical elements exist, extract as {leader: "...", response: "..."}. If none, use null.
+- activities: Array of all activities found across the lesson (crafts, games, discussion, etc.)
+- prayerFocus: The prayer focus, closing prayer, or prayer content
 - songSuggestions: Any song titles mentioned (array of strings). If none, use null.
 
-SIDEBAR METADATA (look for sidebar panels, highlighted boxes, or header sections):
-- sidebarMeta: {
-    "bibleTruths": Summary of key Bible truths taught in this lesson,
-    "scripture": The scripture reference (e.g., "Luke 17:11-19"),
+SIDEBAR / LESSON METADATA:
+- elementSidebarMeta: {
+    "scripture": The main scripture reference (e.g., "Genesis 1"),
     "scriptureText": The actual Bible passage text if included,
-    "lessonFocus": The lesson focus statement,
-    "goalsForChildren": What children should learn/take away,
-    "memoryMinute": The memory verse activity description or memory verse with instructions
+    "lessonFocus": The lesson focus or main idea statement,
+    "goalsForChildren": What children should learn/take away from this lesson,
+    "memoryVerse": The memory verse text,
+    "memoryVerseReference": The scripture reference for the memory verse,
+    "worshipSign": Description of the worship sign or hand motion,
+    "bibleTruth": The key Bible truth or doctrine being taught
   }
 
 PREPARATION & BACKGROUND:
-- preparation: The teacher preparation instructions (what to gather, set up, read ahead of time)
-- bibleBackground: The Bible background or context section explaining the passage for the teacher
+- preparation: Teacher preparation instructions — what to gather, set up, print, or read ahead of time
+- bibleBackground: Bible background or context explaining the passage for the teacher's understanding
 
-SIX LESSON SECTIONS (extract each section with its content):
-- lessonSections: {
-    "welcome": Extract the Welcome section — greeting activities, opening questions, transition into lesson. Include step-by-step instructions and any materials needed.
-    "bibleTime": Extract the Bible Time section — telling the Bible story, reading scripture, dramatic presentation. Include the full story content and teacher instructions.
-    "talkAndMemorize": Extract the Talk and Memorize section — discussion of the lesson, memory verse practice activities, comprehension questions.
-    "sing": Extract the Sing section — songs to sing, lyrics if provided, hand motions or actions, how the song connects to the lesson.
-    "makeAndDo": Extract the Make and Do section — crafts, hands-on activities, games. Include materials lists and step-by-step instructions.
-    "finalFocus": Extract the Final Focus section — review, closing prayer, take-home reminders, transition/dismissal.
+WORSHIP ELEMENT SECTIONS — Extract each element of worship that appears in this lesson:
+- elementSections: {
+    "callToWorship": Content for the Call to Worship element — how the lesson opens with God calling His people. Include any scripted dialogue (teacher words bold, instructions not), responsive reading, or opening activity.
+    "prayer": Content for the Prayer element — prayers during the lesson, prayer activities, guided prayer, or prayer focus.
+    "praise": Content for the Praise element — songs to sing, singing activities, hymns, hand motions during songs, how music connects to the lesson.
+    "readingTheWord": Content for the Reading the Word element — the Bible story, scripture reading, dramatic retelling, or scripture engagement activity.
+    "walkingInTheWord": Content for the Walking in the Word element — application of the Bible story, discussion questions, life application, crafts or activities that reinforce the lesson.
+    "confessionOfSin": Content for the Confession of Sin element — teaching about sin, confession activities, guided confession. If not in this lesson, use null.
+    "assuranceOfPardon": Content for the Assurance of Pardon element — teaching about forgiveness, assurance activities. If not in this lesson, use null.
+    "confessionOfFaith": Content for the Confession of Faith element — creed, affirmation of belief, or faith statement activity. If not in this lesson, use null.
+    "sacraments": Content for the Sacraments element — teaching about baptism or Lord's Supper. If not in this lesson, use null.
+    "tithesAndOfferings": Content for the Tithes & Offerings element — teaching about giving, offering activity. If not in this lesson, use null.
+    "benediction": Content for the Benediction/Closing element — closing blessing, dismissal, transition back to corporate worship. If not in this lesson, use null.
   }
 
-Each lesson section should be structured as:
+Each element section should be structured as:
 {
-  "title": "Section name as written in the document",
-  "content": "The main narrative/descriptive content of this section",
-  "instructions": ["Step 1...", "Step 2...", ...],
-  "materials": ["item1", "item2", ...] (if any materials are listed, otherwise omit)
+  "title": "Element name as written in the document (e.g., 'Call to Worship', 'Reading the Word')",
+  "content": "The main narrative/descriptive content — include the full teacher script with bold teacher words and non-bold instructions preserved",
+  "instructions": ["Step 1...", "Step 2...", ...] (specific teacher instructions),
+  "materials": ["item1", "item2", ...] (if any materials are listed for this element),
+  "teacherScript": "The scripted teacher dialogue if present — bold text is what the teacher says aloud, non-bold text is stage directions/instructions"
 }
 
-If a section is not found in the document, set it to null.
+If a worship element section is not found in the lesson, set it to null.
 
-IMPORTANT: Extract ALL fields thoroughly. Never skip or force-null a field — always extract what's present in the document.
+IMPORTANT:
+- Extract ALL fields thoroughly. Never skip or force-null a field that has content in the document.
+- The curriculum uses BOLD text for teacher's spoken words and regular text for instructions — preserve this distinction in teacherScript.
+- Some element pages are shared across all lessons in the unit (printed once, used four times). If an element page has content for multiple lessons, extract the relevant content for each lesson.
+- Core elements (Call to Worship, Prayer, Praise, Reading the Word, Walking in the Word, Closing) appear in most lessons. Additional elements (Confession of Sin, Assurance of Pardon, etc.) may only appear in some.
 
 Respond with JSON:
 {
@@ -1254,20 +1297,25 @@ Respond with JSON:
       "memoryVerse": "...",
       "memoryVerseReference": "...",
       "worshipSign": "...",
-      "callAndResponse": {"leader": "...", "response": "..."} or null if not present,
-      "activities": ["activity 1", "activity 2", ...] (extract all activities found),
+      "callAndResponse": {"leader": "...", "response": "..."} or null,
+      "activities": ["..."],
       "prayerFocus": "...",
-      "songSuggestions": ["song 1", ...] or null if no songs mentioned,
-      "sidebarMeta": { "bibleTruths": "...", "scripture": "...", "scriptureText": "...", "lessonFocus": "...", "goalsForChildren": "...", "memoryMinute": "..." },
+      "songSuggestions": ["..."] or null,
+      "elementSidebarMeta": { "scripture": "...", "scriptureText": "...", "lessonFocus": "...", "goalsForChildren": "...", "memoryVerse": "...", "memoryVerseReference": "...", "worshipSign": "...", "bibleTruth": "..." },
       "preparation": "...",
       "bibleBackground": "...",
-      "lessonSections": {
-        "welcome": { "title": "...", "content": "...", "instructions": ["..."], "materials": ["..."] },
-        "bibleTime": { "title": "...", "content": "...", "instructions": ["..."] },
-        "talkAndMemorize": { "title": "...", "content": "...", "instructions": ["..."] },
-        "sing": { "title": "...", "content": "...", "instructions": ["..."] },
-        "makeAndDo": { "title": "...", "content": "...", "instructions": ["..."], "materials": ["..."] },
-        "finalFocus": { "title": "...", "content": "...", "instructions": ["..."] }
+      "elementSections": {
+        "callToWorship": { "title": "...", "content": "...", "instructions": ["..."], "teacherScript": "..." } or null,
+        "prayer": { "title": "...", "content": "...", "instructions": ["..."], "teacherScript": "..." } or null,
+        "praise": { "title": "...", "content": "...", "instructions": ["..."] } or null,
+        "readingTheWord": { "title": "...", "content": "...", "instructions": ["..."], "teacherScript": "..." } or null,
+        "walkingInTheWord": { "title": "...", "content": "...", "instructions": ["..."], "materials": ["..."] } or null,
+        "confessionOfSin": null or { ... },
+        "assuranceOfPardon": null or { ... },
+        "confessionOfFaith": null or { ... },
+        "sacraments": null or { ... },
+        "tithesAndOfferings": null or { ... },
+        "benediction": { "title": "...", "content": "...", "instructions": ["..."] } or null
       }
     }
   ]
@@ -1318,6 +1366,7 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
     title: structure.unitTitle || "Uploaded Curriculum",
     description: structure.unitDescription || `Curriculum about ${structure.worshipElement || "worship"}`,
     worshipElement: structure.worshipElement || "Worship",
+    elementSpotlight: structure.elementSpotlight || "",
   }).returning();
 
   const unitId = insertedUnit.id;
@@ -1341,6 +1390,8 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
       sidebarMeta: lesson.sidebarMeta || null,
       preparation: lesson.preparation || "",
       bibleBackground: lesson.bibleBackground || "",
+      elementSections: lesson.elementSections || null,
+      elementSidebarMeta: lesson.elementSidebarMeta || null,
     });
   }
 

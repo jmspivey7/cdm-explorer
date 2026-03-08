@@ -22,6 +22,14 @@ interface Lesson {
   songSuggestions: string[] | null;
 }
 
+interface UnitSummary {
+  id: number;
+  number: number;
+  title: string;
+  worshipElement: string;
+  lessonsCount: number;
+}
+
 interface UnitDetail {
   id: number;
   number: number;
@@ -49,7 +57,7 @@ export default function WorshipParents() {
   const [loading, setLoading] = useState(false);
   const [lessonData, setLessonData] = useState<Lesson | null>(null);
 
-  const { data: allUnits } = useQuery<UnitDetail[]>({
+  const { data: allUnits } = useQuery<UnitSummary[]>({
     queryKey: ["/api/worship/units"],
     queryFn: async () => {
       const res = await fetch("/api/worship/units");

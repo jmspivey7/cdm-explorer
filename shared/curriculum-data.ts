@@ -1,14 +1,33 @@
-// Hardcoded curriculum data for CDM Explorer — Worship Explorer section
-// Based on "Exploring the Elements of Worship" curriculum by Teach Us to Worship
+import type {
+  WorshipElementSections,
+  WorshipElementKey,
+  ElementSectionData,
+  LessonSidebarMeta,
+  LessonSections,
+  LessonSectionData,
+  SidebarMeta,
+} from "./schema";
+
+export type {
+  WorshipElementSections,
+  WorshipElementKey,
+  ElementSectionData,
+  LessonSidebarMeta,
+  LessonSections,
+  LessonSectionData,
+  SidebarMeta,
+};
 
 export interface WorshipElement {
   id: string;
   name: string;
+  elementKey: WorshipElementKey;
   icon: string;
   color: string;
   shortDescription: string;
   childFriendlyExplanation: string;
   handMotion?: string;
+  core: boolean;
   relatedUnits: number[];
 }
 
@@ -22,31 +41,6 @@ export interface PreGeneratedQuiz {
   options: string[];
   correctIndex: number;
   explanation: string;
-}
-
-export interface LessonSectionData {
-  title: string;
-  content: string;
-  instructions: string[];
-  materials?: string[];
-}
-
-export interface LessonSections {
-  welcome: LessonSectionData | null;
-  bibleTime: LessonSectionData | null;
-  talkAndMemorize: LessonSectionData | null;
-  sing: LessonSectionData | null;
-  makeAndDo: LessonSectionData | null;
-  finalFocus: LessonSectionData | null;
-}
-
-export interface SidebarMeta {
-  bibleTruths: string;
-  scripture: string;
-  scriptureText: string;
-  lessonFocus: string;
-  goalsForChildren: string;
-  memoryMinute: string;
 }
 
 export interface LessonData {
@@ -67,6 +61,8 @@ export interface LessonData {
   sidebarMeta?: SidebarMeta | null;
   preparation?: string;
   bibleBackground?: string;
+  elementSections?: WorshipElementSections | null;
+  elementSidebarMeta?: LessonSidebarMeta | null;
 }
 
 export interface UnitOverview {
@@ -82,133 +78,163 @@ export interface UnitDetail {
   title: string;
   description: string;
   worshipElement: string;
+  elementSpotlight?: string;
   lessons: LessonData[];
 }
 
-// ============================================
-// 12 WORSHIP ELEMENTS (hardcoded constants)
-// ============================================
+export const WORSHIP_ELEMENT_KEYS: WorshipElementKey[] = [
+  "callToWorship",
+  "prayer",
+  "praise",
+  "readingTheWord",
+  "walkingInTheWord",
+  "confessionOfSin",
+  "assuranceOfPardon",
+  "confessionOfFaith",
+  "sacraments",
+  "tithesAndOfferings",
+  "benediction",
+];
+
+export const CORE_ELEMENT_KEYS: WorshipElementKey[] = [
+  "callToWorship",
+  "praise",
+  "prayer",
+  "readingTheWord",
+  "walkingInTheWord",
+];
 
 export const WORSHIP_ELEMENTS: WorshipElement[] = [
   {
     id: "call-to-worship",
     name: "Call to Worship",
+    elementKey: "callToWorship",
     icon: "megaphone",
     color: "#3FD0A6",
-    shortDescription: "God calls us to worship Him!",
+    shortDescription: "God calls His people to gather and worship Him!",
     childFriendlyExplanation: "When we come to church, God invites us to worship Him. It is like getting a special invitation to talk to the King of everything! The Call to Worship tells us that God wants to be with us and hear our praises.",
     handMotion: "Cup hands around mouth like calling out",
+    core: true,
     relatedUnits: [2],
   },
   {
-    id: "prayer-of-invocation",
-    name: "Prayer of Invocation",
+    id: "prayer",
+    name: "Prayer",
+    elementKey: "prayer",
     icon: "hand-heart",
     color: "#F2C94C",
-    shortDescription: "We ask God to be with us!",
-    childFriendlyExplanation: "After God calls us to worship, we pray and ask Him to be right here with us. We know God is everywhere, but in this prayer we say, 'God, please be close to us today as we worship You.'",
-    handMotion: "Fold hands in prayer, then open wide",
+    shortDescription: "We talk to God through prayer!",
+    childFriendlyExplanation: "Prayer is how we talk to God. We can thank Him, tell Him we are sorry, ask Him for help, and ask Him to help others. God always listens when we pray because He loves us so much!",
+    handMotion: "Fold hands together in prayer",
+    core: true,
     relatedUnits: [3],
   },
   {
-    id: "hymn-of-praise",
-    name: "Hymn of Praise",
+    id: "praise",
+    name: "Praise",
+    elementKey: "praise",
     icon: "music",
     color: "#87CEEB",
-    shortDescription: "We sing to tell God how great He is!",
-    childFriendlyExplanation: "We sing songs to God because He is wonderful! When we sing hymns, we are using our voices to tell God how awesome, strong, and loving He is. Singing together makes worship special.",
+    shortDescription: "We gather to praise God with all our being!",
+    childFriendlyExplanation: "We sing songs to God because He is wonderful! When we praise God, we use our voices, our hands, and our whole bodies to tell God how awesome, strong, and loving He is. Singing together makes worship special.",
     handMotion: "Hands up, swaying gently",
+    core: true,
     relatedUnits: [4],
   },
   {
-    id: "reading-of-the-law",
-    name: "Reading of the Law",
-    icon: "scroll-text",
+    id: "reading-the-word",
+    name: "Reading the Word",
+    elementKey: "readingTheWord",
+    icon: "book-open",
     color: "#FF7F7F",
-    shortDescription: "We hear God's rules for living!",
-    childFriendlyExplanation: "God gave us rules because He loves us. The Ten Commandments help us know how to love God and love other people. When we hear the Law read in church, it reminds us of how God wants us to live.",
-    handMotion: "Hold hands open like a book",
+    shortDescription: "God speaks to His people through His Word!",
+    childFriendlyExplanation: "The Bible is God's Word. When it is read in church, God is speaking to us! We listen carefully because the Bible tells us about who God is, what He has done, and how much He loves us.",
+    handMotion: "Cup hand to ear, then open hands like a book",
+    core: true,
     relatedUnits: [5],
+  },
+  {
+    id: "walking-in-the-word",
+    name: "Walking in the Word",
+    elementKey: "walkingInTheWord",
+    icon: "footprints",
+    color: "#A8D5BA",
+    shortDescription: "God's Word teaches His people how to live!",
+    childFriendlyExplanation: "Walking in the Word means we don't just hear God's Word — we do what it says! God teaches us how to live, how to love others, and how to follow Jesus every single day.",
+    handMotion: "March feet in place",
+    core: true,
+    relatedUnits: [6],
   },
   {
     id: "confession-of-sin",
     name: "Confession of Sin",
+    elementKey: "confessionOfSin",
     icon: "heart-crack",
     color: "#B8A9C9",
-    shortDescription: "We tell God when we mess up.",
+    shortDescription: "Because God loves us, we can confess our sins to Him.",
     childFriendlyExplanation: "Everyone makes mistakes and does things wrong sometimes. In confession, we tell God we are sorry for the wrong things we have done. God loves us so much that He always listens and forgives us.",
     handMotion: "Hand on heart, then open palms up",
-    relatedUnits: [6],
+    core: false,
+    relatedUnits: [7],
   },
   {
     id: "assurance-of-pardon",
     name: "Assurance of Pardon",
+    elementKey: "assuranceOfPardon",
     icon: "sun",
     color: "#FFDAB9",
-    shortDescription: "God tells us we are forgiven!",
+    shortDescription: "We know we are forgiven because Jesus died for our sins!",
     childFriendlyExplanation: "After we say we are sorry, God tells us something wonderful: we are forgiven! Because Jesus died for us, our sins are washed away. It is like the sun coming out after a storm.",
     handMotion: "Arms spread wide with a big smile",
-    relatedUnits: [7],
-  },
-  {
-    id: "reading-of-the-word",
-    name: "Reading of the Word",
-    icon: "book-open",
-    color: "#3FD0A6",
-    shortDescription: "We listen to God's special book!",
-    childFriendlyExplanation: "The Bible is God's Word. When it is read in church, God is speaking to us! We listen carefully because the Bible tells us about who God is, what He has done, and how much He loves us.",
-    handMotion: "Cup hand to ear, then open hands like a book",
+    core: false,
     relatedUnits: [8],
   },
   {
-    id: "sermon",
-    name: "Sermon",
-    icon: "message-circle",
-    color: "#F2C94C",
-    shortDescription: "The pastor helps us understand God's Word!",
-    childFriendlyExplanation: "The sermon is when the pastor teaches us what the Bible means. The pastor is like a guide who helps us understand God's story and how it matters for our lives today.",
-    handMotion: "Point to ear, then point forward",
-    relatedUnits: [10],
+    id: "confession-of-faith",
+    name: "Confession of Faith",
+    elementKey: "confessionOfFaith",
+    icon: "shield",
+    color: "#E8B4B8",
+    shortDescription: "We gather and affirm what we, as God's people, believe.",
+    childFriendlyExplanation: "A confession of faith is when we all say together what we believe about God. It's like making a promise out loud that we trust in God the Father, Jesus His Son, and the Holy Spirit.",
+    handMotion: "Hand on heart, standing tall",
+    core: false,
+    relatedUnits: [11],
   },
   {
     id: "sacraments",
     name: "Sacraments",
+    elementKey: "sacraments",
     icon: "droplets",
     color: "#87CEEB",
-    shortDescription: "Special signs that show God's promises!",
+    shortDescription: "God gives us signs to proclaim His love for us!",
     childFriendlyExplanation: "Baptism and the Lord's Supper are special gifts from God. Baptism uses water to show that God has made us part of His family. The Lord's Supper uses bread and juice to remind us of Jesus.",
     handMotion: "Cup hands together as if holding water",
-    relatedUnits: [11],
+    core: false,
+    relatedUnits: [9],
+  },
+  {
+    id: "tithes-and-offerings",
+    name: "Tithes & Offerings",
+    elementKey: "tithesAndOfferings",
+    icon: "gift",
+    color: "#C4A862",
+    shortDescription: "Everything belongs to the Lord!",
+    childFriendlyExplanation: "Everything we have comes from God. When we give our tithes and offerings, we are saying thank you to God and trusting Him to take care of us. We give because God gave us the best gift — Jesus!",
+    handMotion: "Hold hands out offering something",
+    core: false,
+    relatedUnits: [10],
   },
   {
     id: "benediction",
     name: "Benediction",
+    elementKey: "benediction",
     icon: "hand",
     color: "#F5C6D0",
-    shortDescription: "God sends us out with a blessing!",
+    shortDescription: "God sends us with His blessing!",
     childFriendlyExplanation: "At the end of worship, the pastor speaks God's blessing over us. It is like God giving us a big hug and saying, 'Go and share my love with everyone you meet this week!'",
     handMotion: "Hands raised receiving, then pointing outward",
+    core: false,
     relatedUnits: [12],
   },
-  {
-    id: "doxology",
-    name: "Doxology",
-    icon: "star",
-    color: "#F2C94C",
-    shortDescription: "A special song praising God forever!",
-    childFriendlyExplanation: "The Doxology is a song that Christians have been singing for hundreds of years. It praises God the Father, Son, and Holy Spirit. When we sing it, we join with Christians everywhere and throughout all of history!",
-    handMotion: "Hands lifted high, fingers spread like stars",
-    relatedUnits: [13],
-  },
-  {
-    id: "prayer-of-illumination",
-    name: "Prayer of Illumination",
-    icon: "lightbulb",
-    color: "#FFDAB9",
-    shortDescription: "We ask God to help us understand!",
-    childFriendlyExplanation: "Before we hear God's Word read and taught, we pray and ask God's Holy Spirit to turn the lights on in our minds and hearts so we can understand what He is saying to us.",
-    handMotion: "Hands on head like a lightbulb turning on",
-    relatedUnits: [9],
-  },
 ];
-
