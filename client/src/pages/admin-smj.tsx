@@ -161,7 +161,7 @@ export default function AdminSMJ() {
         </button>
         <div>
           <h1 className="font-display font-bold text-gray-800 text-lg">
-            <span className="font-accent text-2xl text-se-green">SMJ</span>{" "}
+            <span className="font-accent text-2xl text-se-green">Jesus</span>{" "}
             <span className="font-accent text-2xl text-se-blue">Explorer</span>
             <span className="text-gray-400 text-sm ml-2">Admin</span>
           </h1>

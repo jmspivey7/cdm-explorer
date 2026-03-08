@@ -82,7 +82,7 @@ export default function SMJParents() {
         </button>
         <div>
           <h1 className="font-display font-bold text-gray-800 text-lg">
-            <span className="font-accent text-xl text-se-green">SMJ</span>{" "}
+            <span className="font-accent text-xl text-se-green">Jesus</span>{" "}
             <span className="font-accent text-xl text-se-blue">Explorer</span>
             <span className="text-gray-400 text-sm ml-2">Parents</span>
           </h1>

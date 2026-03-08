@@ -85,7 +85,7 @@ export default function Home() {
                        hover:border-se-green/60 transition-all group shadow-sm text-center"
           >
             <h2 className="font-display text-4xl font-extrabold text-gray-800 mb-2 whitespace-nowrap">
-              <span className="font-accent text-4xl text-se-green">SMJ</span>{" "}
+              <span className="font-accent text-4xl text-se-green">Jesus</span>{" "}
               <span className="font-accent text-4xl text-se-blue">Explorer</span>
             </h2>
             <p className="text-black font-display text-lg font-semibold mb-3">

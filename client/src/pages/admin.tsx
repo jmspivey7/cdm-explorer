@@ -87,7 +87,7 @@ export default function Admin() {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-display text-lg font-bold text-gray-800">
-              <span className="font-accent text-2xl text-se-green">SMJ</span>{" "}
+              <span className="font-accent text-2xl text-se-green">Jesus</span>{" "}
               <span className="font-accent text-2xl text-se-blue">Explorer</span>
             </h3>
             <p className="text-gray-500 text-sm">Upload and manage Show Me Jesus lessons</p>
