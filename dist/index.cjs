@@ -2204,9 +2204,8 @@ app.use(import_express3.default.urlencoded({ extended: false, limit: "10mb" }));
 var server = (0, import_http.createServer)(app);
 (async () => {
   await registerRoutes(server, app);
-  const isDev = process.env.NODE_ENV !== "production";
-  if (isDev) {
-    const { setupVite } = await import("./vite");
+  if (false) {
+    const { setupVite } = await Function('return import("./vite")')();
     await setupVite(server, app);
   } else {
     serveStatic(app);

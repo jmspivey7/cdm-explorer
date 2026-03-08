@@ -8,7 +8,7 @@ execSync("npx vite build", { cwd: root, stdio: "inherit" });
 
 console.log("Building server...");
 execSync(
-  'npx esbuild server/index.ts --bundle --platform=node --outfile=dist/index.cjs --format=cjs --packages=external --external:./vite --external:../vite.config',
+  `npx esbuild server/index.ts --bundle --platform=node --outfile=dist/index.cjs --format=cjs --packages=external --define:process.env.NODE_ENV='"production"'`,
   { cwd: root, stdio: "inherit" }
 );
 
