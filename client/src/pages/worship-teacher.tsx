@@ -87,7 +87,11 @@ export default function WorshipTeacher() {
         }),
       });
       const data = await res.json();
-      setAiContent(data.result);
+      if (data.error || data.message) {
+        setAiContent({ error: data.error || data.message });
+      } else {
+        setAiContent({ type, ...data });
+      }
     } catch (err: any) {
       setAiContent({
         error: err.message || "Failed to generate content. Make sure OPENAI_API_KEY is set.",
@@ -377,15 +381,76 @@ export default function WorshipTeacher() {
                             >
                               {aiContent.error ? (
                                 <p className="text-red-500 text-sm">{aiContent.error}</p>
+                              ) : aiContent.type === "discussion" && aiContent.questions ? (
+                                <div className="space-y-4">
+                                  {aiContent.questions.map((q: any, idx: number) => (
+                                    <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                                      <p className="font-display font-bold text-gray-800 text-sm mb-1">
+                                        {idx + 1}. {q.question}
+                                      </p>
+                                      {q.followUp && (
+                                        <p className="text-gray-500 text-xs ml-4 mb-1">
+                                          <span className="font-semibold">Follow-up:</span> {q.followUp}
+                                        </p>
+                                      )}
+                                      {q.connection && (
+                                        <p className="text-se-blue text-xs ml-4">
+                                          <span className="font-semibold">Connection:</span> {q.connection}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : aiContent.type === "illustration" && aiContent.illustrations ? (
+                                <div className="space-y-4">
+                                  {aiContent.illustrations.map((ill: any, idx: number) => (
+                                    <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                                      <p className="font-display font-bold text-gray-800 text-sm mb-1">
+                                        {ill.title}
+                                      </p>
+                                      {ill.materials && ill.materials.length > 0 && (
+                                        <p className="text-gray-500 text-xs mb-1">
+                                          <span className="font-semibold">Materials:</span> {ill.materials.join(", ")}
+                                        </p>
+                                      )}
+                                      <p className="text-gray-600 text-sm mb-1">{ill.description}</p>
+                                      {ill.connection && (
+                                        <p className="text-se-blue text-xs">
+                                          <span className="font-semibold">Worship connection:</span> {ill.connection}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : aiContent.type === "activity" && aiContent.activities ? (
+                                <div className="space-y-4">
+                                  {aiContent.activities.map((act: any, idx: number) => (
+                                    <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                                      <p className="font-display font-bold text-gray-800 text-sm mb-1">
+                                        {act.title}
+                                        {act.duration && (
+                                          <span className="text-gray-400 font-normal ml-2">({act.duration})</span>
+                                        )}
+                                      </p>
+                                      {act.materials && act.materials.length > 0 && (
+                                        <p className="text-gray-500 text-xs mb-1">
+                                          <span className="font-semibold">Materials:</span> {act.materials.join(", ")}
+                                        </p>
+                                      )}
+                                      <p className="text-gray-600 text-sm mb-1">{act.instructions}</p>
+                                      {act.worshipConnection && (
+                                        <p className="text-se-blue text-xs">
+                                          <span className="font-semibold">Worship connection:</span> {act.worshipConnection}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               ) : (
                                 <div className="text-gray-700 text-sm prose prose-sm max-w-none">
-                                  {typeof aiContent === "string" ? (
-                                    <p>{aiContent}</p>
-                                  ) : (
-                                    <pre className="whitespace-pre-wrap font-sans">
-                                      {JSON.stringify(aiContent, null, 2)}
-                                    </pre>
-                                  )}
+                                  <pre className="whitespace-pre-wrap font-sans">
+                                    {JSON.stringify(aiContent, null, 2)}
+                                  </pre>
                                 </div>
                               )}
                             </motion.div>
