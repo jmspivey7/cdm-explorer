@@ -28,7 +28,7 @@ export default function Home() {
           <img src={cdmLogo} alt="CDM Discipleship Ministries" className="h-[195px] mx-auto mb-1" />
         </motion.div>
 
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6">
           <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -71,6 +71,28 @@ export default function Home() {
             <p className="text-gray-500 text-sm mx-auto">
               Interactive training to explain and explore the essential elements
               of corporate worship for young people.
+            </p>
+          </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setLocation("/smj")}
+            className="w-full bg-white border-2 border-gray-200 rounded-2xl p-8
+                       hover:border-se-green/60 transition-all group shadow-sm text-center"
+          >
+            <h2 className="font-display text-4xl font-extrabold text-gray-800 mb-2 whitespace-nowrap">
+              <span className="font-accent text-5xl text-se-green">SMJ</span>{" "}
+              <span className="font-accent text-5xl text-se-blue">Explorer</span>
+            </h2>
+            <p className="text-black font-display text-lg font-semibold mb-3">
+              <span className="font-accent text-xl">Show Me Jesus, Brought to Life</span>
+            </p>
+            <p className="text-gray-500 text-sm mx-auto">
+              Interactive preschool Bible curriculum that brings the story of Jesus to life for young learners.
             </p>
           </motion.button>
         </div>

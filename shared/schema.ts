@@ -85,6 +85,65 @@ export interface SidebarMeta {
   memoryMinute: string;
 }
 
+export interface SMJBibleStoryScene {
+  sceneNumber: number;
+  title: string;
+  narrative: string;
+  imageUrl: string | null;
+  imagePrompt: string;
+}
+
+export interface SMJCatechismPair {
+  question: string;
+  answer: string;
+  questionNumber?: string;
+}
+
+export interface SMJDiscussionQuestion {
+  question: string;
+  expectedAnswer: string;
+}
+
+export interface SMJBibleVerse {
+  reference: string;
+  text: string;
+}
+
+export interface SMJQuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface SMJStorySequenceEvent {
+  order: number;
+  event: string;
+}
+
+export const smjLessons = pgTable("smj_lessons", {
+  id: text("id").primaryKey(),
+  lessonNumber: integer("lesson_number").notNull().default(0),
+  title: text("title").notNull().default("Processing..."),
+  scripture: text("scripture").default(""),
+  bibleTruth: text("bible_truth").default(""),
+  lessonFocus: text("lesson_focus").default(""),
+  goalsForChildren: jsonb("goals_for_children").$type<string[]>(),
+  bibleStoryScenes: jsonb("bible_story_scenes").$type<SMJBibleStoryScene[]>(),
+  welcomeStory: text("welcome_story").default(""),
+  catechismPairs: jsonb("catechism_pairs").$type<SMJCatechismPair[]>(),
+  discussionQuestions: jsonb("discussion_questions").$type<SMJDiscussionQuestion[]>(),
+  bibleVerses: jsonb("bible_verses").$type<SMJBibleVerse[]>(),
+  closingPrayer: text("closing_prayer").default(""),
+  preGeneratedQuiz: jsonb("pre_generated_quiz").$type<SMJQuizQuestion[]>(),
+  storySequenceEvents: jsonb("story_sequence_events").$type<SMJStorySequenceEvent[]>(),
+  status: text("status").notNull().default("processing"),
+  progress: integer("progress").default(0),
+  currentStep: text("current_step").default(""),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const worshipLessons = pgTable("worship_lessons", {
   id: serial("id").primaryKey(),
   unitId: integer("unit_id").notNull().references(() => worshipUnits.id, { onDelete: "cascade" }),

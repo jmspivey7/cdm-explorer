@@ -37,6 +37,9 @@ fs.mkdirSync(IMAGES_DIR, { recursive: true });
 export async function registerRoutes(server: Server, app: Express) {
   app.use("/generated", express.static(path.resolve("generated")));
 
+  const { registerSMJRoutes } = await import("./smj-routes");
+  registerSMJRoutes(app);
+
   app.get("/api/sermons", async (_req, res) => {
     try {
       const rows = await db.select().from(sermons);
