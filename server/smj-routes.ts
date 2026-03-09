@@ -604,7 +604,7 @@ Return JSON:
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 3000,
+      max_completion_tokens: 3000,
     });
 
     const scenesData = JSON.parse(scenesResponse.choices[0]?.message?.content || "{}");

@@ -712,7 +712,7 @@ Return JSON:
         }
       ],
       response_format: { type: "json_object" },
-      max_tokens: 3e3
+      max_completion_tokens: 3e3
     });
     const scenesData = JSON.parse(scenesResponse.choices[0]?.message?.content || "{}");
     const scenes = (scenesData.scenes || []).map((s) => ({
@@ -1688,7 +1688,7 @@ ${text2.substring(0, 12e3)}`
       }
     ],
     response_format: { type: "json_object" },
-    max_tokens: 16384
+    max_completion_tokens: 16384
   });
   const raw = response.choices[0].message.content || '{"scenes":[]}';
   if (response.choices[0].finish_reason === "length") {
@@ -1732,7 +1732,7 @@ ${text2.substring(0, 8e3)}`
         }
       ],
       response_format: { type: "json_object" },
-      max_tokens: 16384
+      max_completion_tokens: 16384
     });
     const retryRaw = retryResponse.choices[0].message.content || '{"scenes":[]}';
     const retryParsed = JSON.parse(retryRaw);
