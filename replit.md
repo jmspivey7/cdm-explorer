@@ -27,6 +27,7 @@ server/          - Express backend
   index.ts       - Server entry point (port 5000, host 0.0.0.0)
   routes.ts      - API routes, AI processing pipeline, Gemini native image generation
   smj-routes.ts  - SMJ Explorer API routes and processing pipeline
+  image-storage.ts - Image persistence via Replit Object Storage with local cache fallback
   db.ts          - Drizzle ORM database client (Neon serverless pool)
   vite.ts        - Vite dev server middleware integration
   static.ts      - Static file serving for production
@@ -147,9 +148,11 @@ The teacher view (`worship-teacher.tsx`) renders lesson plans in a two-column la
 - Config: `{ responseModalities: ["TEXT", "IMAGE"] }`
 - Response: Find `inlineData` part in `response.candidates[0].content.parts` — base64-encoded image data
 - Safety prefix prepended to every prompt: child-safe settings, no Jesus/God figures, no text, no inappropriate content
-- Images saved locally to `generated/images/` as PNG files
-- URLs returned as `/generated/images/<id>-scene<index>.png`
-- Retry logic: 3 attempts with exponential backoff; simplified prompt on retries
+- Images persisted to **Replit Object Storage** (`@replit/object-storage`) for durability across autoscale restarts, with local filesystem as cache
+- Image storage module: `server/image-storage.ts` — `saveImage(filename, buffer)` uploads to Object Storage + local; `serveImage(req, res)` serves from local cache first, then Object Storage fallback
+- URLs returned as `/generated/images/<id>-scene<index>.png` (served by dedicated Express route, not static middleware)
+- Retry logic: 3 attempts with exponential backoff (10s initial, up to 60s max); simplified prompt on retries
+- Inter-scene delay: 10 seconds between Gemini image generation calls to avoid rate limiting
 - SMJ images saved as `smj-<lessonId>-scene<index>.png`
 
 ## Ken Burns CSS Effects

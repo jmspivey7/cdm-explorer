@@ -127,6 +127,110 @@ var init_db = __esm({
   }
 });
 
+// server/image-storage.ts
+var image_storage_exports = {};
+__export(image_storage_exports, {
+  deleteImage: () => deleteImage,
+  saveImage: () => saveImage,
+  serveImage: () => serveImage
+});
+async function getObjectStorageClient() {
+  if (objectStorageClient) return objectStorageClient;
+  const now = Date.now();
+  if (now - lastInitAttempt < INIT_RETRY_INTERVAL) return null;
+  lastInitAttempt = now;
+  try {
+    const { Client } = await import("@replit/object-storage");
+    objectStorageClient = new Client();
+    console.log("Object Storage client initialized");
+    return objectStorageClient;
+  } catch (err) {
+    console.warn("Object Storage not available, using local filesystem only:", err.message);
+    return null;
+  }
+}
+async function saveImage(filename, buffer) {
+  const localPath = import_path.default.join(IMAGES_DIR, filename);
+  import_fs.default.writeFileSync(localPath, buffer);
+  const client = await getObjectStorageClient();
+  if (client) {
+    const key = `images/${filename}`;
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await client.uploadFromBytes(key, buffer);
+        console.log(`Image uploaded to Object Storage: ${key} (${(buffer.length / 1024).toFixed(0)}KB)`);
+        break;
+      } catch (err) {
+        console.error(`Object Storage upload attempt ${attempt + 1}/${maxRetries} failed for ${key}: ${err.message}`);
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 2e3 * (attempt + 1)));
+        } else {
+          console.error(`All Object Storage upload attempts failed for ${key} \u2014 image saved locally only`);
+        }
+      }
+    }
+  }
+  return `/generated/images/${filename}`;
+}
+async function deleteImage(filename) {
+  const localPath = import_path.default.join(IMAGES_DIR, filename);
+  if (import_fs.default.existsSync(localPath)) {
+    import_fs.default.unlinkSync(localPath);
+  }
+  const client = await getObjectStorageClient();
+  if (client) {
+    try {
+      const key = `images/${filename}`;
+      await client.delete(key);
+      console.log(`Deleted from Object Storage: ${key}`);
+    } catch (err) {
+      console.warn(`Failed to delete from Object Storage: ${filename}: ${err.message}`);
+    }
+  }
+}
+async function serveImage(req, res) {
+  const filename = req.params.filename || req.params[0];
+  if (!filename || filename.includes("..") || filename.includes("/")) {
+    return res.status(400).send("Invalid filename");
+  }
+  const localPath = import_path.default.join(IMAGES_DIR, filename);
+  if (import_fs.default.existsSync(localPath)) {
+    res.set("Cache-Control", "public, max-age=86400");
+    return res.sendFile(localPath);
+  }
+  const client = await getObjectStorageClient();
+  if (client) {
+    try {
+      const key = `images/${filename}`;
+      const result = await client.downloadAsBytes(key);
+      if (result && result.value) {
+        const buffer = Buffer.from(result.value);
+        import_fs.default.writeFileSync(localPath, buffer);
+        res.set("Content-Type", "image/png");
+        res.set("Cache-Control", "public, max-age=86400");
+        return res.send(buffer);
+      }
+    } catch (err) {
+      console.warn(`Image not found in Object Storage: ${filename}`);
+    }
+  }
+  res.status(404).send("Image not found");
+}
+var import_fs, import_path, IMAGES_DIR, objectStorageClient, lastInitAttempt, INIT_RETRY_INTERVAL;
+var init_image_storage = __esm({
+  "server/image-storage.ts"() {
+    "use strict";
+    import_fs = __toESM(require("fs"), 1);
+    import_path = __toESM(require("path"), 1);
+    IMAGES_DIR = import_path.default.resolve("generated", "images");
+    import_fs.default.mkdirSync(IMAGES_DIR, { recursive: true });
+    objectStorageClient = null;
+    lastInitAttempt = 0;
+    INIT_RETRY_INTERVAL = 3e4;
+  }
+});
+
 // server/smj-routes.ts
 var smj_routes_exports = {};
 __export(smj_routes_exports, {
@@ -165,16 +269,12 @@ function registerSMJRoutes(app2) {
     try {
       const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, req.params.id));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
+      const { deleteImage: deleteImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
       const scenes = lesson.bibleStoryScenes || [];
       for (const scene of scenes) {
         if (scene.imageUrl) {
-          const imgPath = import_path.default.resolve(
-            "generated",
-            scene.imageUrl.replace(/^\/generated\//, "")
-          );
-          if (import_fs.default.existsSync(imgPath)) {
-            import_fs.default.unlinkSync(imgPath);
-          }
+          const fname = scene.imageUrl.split("/").pop();
+          if (fname) await deleteImage2(fname);
         }
       }
       await db.delete(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, req.params.id));
@@ -186,11 +286,11 @@ function registerSMJRoutes(app2) {
   app2.post("/api/smj/upload", upload.single("document"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const ext = import_path.default.extname(req.file.originalname).toLowerCase();
+      const ext = import_path2.default.extname(req.file.originalname).toLowerCase();
       let rawText = "";
       if (ext === ".pdf") {
         const pdfParse = (await import("pdf-parse")).default;
-        const buffer = import_fs.default.readFileSync(req.file.path);
+        const buffer = import_fs2.default.readFileSync(req.file.path);
         const data = await pdfParse(buffer);
         rawText = data.text;
       } else if (ext === ".docx") {
@@ -198,12 +298,12 @@ function registerSMJRoutes(app2) {
         const result = await mammoth2.extractRawText({ path: req.file.path });
         rawText = result.value;
       } else if (ext === ".txt") {
-        rawText = import_fs.default.readFileSync(req.file.path, "utf8");
+        rawText = import_fs2.default.readFileSync(req.file.path, "utf8");
       } else {
-        import_fs.default.unlinkSync(req.file.path);
+        import_fs2.default.unlinkSync(req.file.path);
         return res.status(400).json({ error: "Unsupported file type" });
       }
-      import_fs.default.unlinkSync(req.file.path);
+      import_fs2.default.unlinkSync(req.file.path);
       if (!rawText.trim()) {
         return res.status(400).json({ error: "Could not extract text from file" });
       }
@@ -396,7 +496,7 @@ async function generateSMJImage(prompt, lessonId, sceneIndex) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.min(5e3 * Math.pow(2, attempt - 1), 3e4);
+        const delay = Math.min(1e4 * Math.pow(2, attempt - 1), 6e4);
         console.log(`Retry ${attempt}/${maxRetries} for ${label}, waiting ${delay / 1e3}s...`);
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -421,11 +521,11 @@ async function generateSMJImage(prompt, lessonId, sceneIndex) {
         throw new Error("Gemini returned no image in response");
       }
       const filename = `smj-${lessonId}-scene${sceneIndex}.png`;
-      const filePath = import_path.default.join(IMAGES_DIR, filename);
       const buffer = Buffer.from(imagePart.inlineData.data, "base64");
-      import_fs.default.writeFileSync(filePath, buffer);
-      console.log(`SMJ image saved: ${filePath} (${(buffer.length / 1024).toFixed(0)}KB)`);
-      return `/generated/images/${filename}`;
+      const { saveImage: saveImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
+      const imageUrl = await saveImage2(filename, buffer);
+      console.log(`SMJ image saved: ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      return imageUrl;
     } catch (err) {
       lastError = err;
       if (err.status === 429 || err.message?.includes("safety")) {
@@ -636,7 +736,7 @@ Return JSON:
         );
         scenes[i].imageUrl = imageUrl;
         if (i < scenes.length - 1) {
-          await new Promise((r) => setTimeout(r, 2e3));
+          await new Promise((r) => setTimeout(r, 1e4));
         }
       } catch (err) {
         console.error(`Failed to generate SMJ image for scene ${i}:`, err.message);
@@ -748,13 +848,13 @@ Return JSON:
     }
   }
 }
-var import_multer, import_fs, import_path, import_openai, import_drizzle_orm, openai, upload, smjUploadProgress, IMAGES_DIR;
+var import_multer, import_fs2, import_path2, import_openai, import_drizzle_orm, openai, upload, smjUploadProgress, IMAGES_DIR2;
 var init_smj_routes = __esm({
   "server/smj-routes.ts"() {
     "use strict";
     import_multer = __toESM(require("multer"), 1);
-    import_fs = __toESM(require("fs"), 1);
-    import_path = __toESM(require("path"), 1);
+    import_fs2 = __toESM(require("fs"), 1);
+    import_path2 = __toESM(require("path"), 1);
     import_openai = __toESM(require("openai"), 1);
     init_db();
     init_schema();
@@ -766,7 +866,7 @@ var init_smj_routes = __esm({
     });
     upload = (0, import_multer.default)({ dest: "uploads/" });
     smjUploadProgress = /* @__PURE__ */ new Map();
-    IMAGES_DIR = import_path.default.resolve("generated", "images");
+    IMAGES_DIR2 = import_path2.default.resolve("generated", "images");
   }
 });
 
@@ -777,8 +877,8 @@ var import_http = require("http");
 // server/routes.ts
 var import_multer2 = __toESM(require("multer"), 1);
 var import_mammoth = __toESM(require("mammoth"), 1);
-var import_fs2 = __toESM(require("fs"), 1);
-var import_path2 = __toESM(require("path"), 1);
+var import_fs3 = __toESM(require("fs"), 1);
+var import_path3 = __toESM(require("path"), 1);
 var import_openai2 = __toESM(require("openai"), 1);
 var import_express = __toESM(require("express"), 1);
 
@@ -932,10 +1032,12 @@ var openai2 = new Proxy({}, {
 });
 var upload2 = (0, import_multer2.default)({ dest: "uploads/" });
 var uploadProgress = /* @__PURE__ */ new Map();
-var IMAGES_DIR2 = import_path2.default.resolve("generated", "images");
-import_fs2.default.mkdirSync(IMAGES_DIR2, { recursive: true });
+var IMAGES_DIR3 = import_path3.default.resolve("generated", "images");
+import_fs3.default.mkdirSync(IMAGES_DIR3, { recursive: true });
 async function registerRoutes(server2, app2) {
-  app2.use("/generated", import_express.default.static(import_path2.default.resolve("generated")));
+  const { serveImage: serveImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
+  app2.get("/generated/images/:filename", serveImage2);
+  app2.use("/generated", import_express.default.static(import_path3.default.resolve("generated")));
   const { registerSMJRoutes: registerSMJRoutes2 } = await Promise.resolve().then(() => (init_smj_routes(), smj_routes_exports));
   registerSMJRoutes2(app2);
   app2.get("/api/sermons", async (_req, res) => {
@@ -969,12 +1071,22 @@ async function registerRoutes(server2, app2) {
       const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
       if (!sermon) return res.status(404).json({ message: "Sermon not found" });
       await db.delete(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
-      const imagesDir = import_path2.default.resolve("generated", "images");
-      if (import_fs2.default.existsSync(imagesDir)) {
-        const files = import_fs2.default.readdirSync(imagesDir);
+      const { deleteImage: deleteImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
+      const imagesDir = import_path3.default.resolve("generated", "images");
+      if (import_fs3.default.existsSync(imagesDir)) {
+        const files = import_fs3.default.readdirSync(imagesDir);
         for (const file of files) {
           if (file.startsWith(sermonId)) {
-            import_fs2.default.unlinkSync(import_path2.default.join(imagesDir, file));
+            await deleteImage2(file);
+          }
+        }
+      }
+      const scenesList = sermon.scenes;
+      if (scenesList) {
+        for (const scene of scenesList) {
+          if (scene.imageUrl) {
+            const fname = scene.imageUrl.split("/").pop();
+            if (fname) await deleteImage2(fname);
           }
         }
       }
@@ -1007,11 +1119,11 @@ async function registerRoutes(server2, app2) {
         text2 = result.value;
       } else if (fileName.endsWith(".pdf")) {
         const pdfParse = (await import("pdf-parse")).default;
-        const dataBuffer = import_fs2.default.readFileSync(filePath);
+        const dataBuffer = import_fs3.default.readFileSync(filePath);
         const pdfData = await pdfParse(dataBuffer);
         text2 = pdfData.text;
       } else if (fileName.endsWith(".txt")) {
-        text2 = import_fs2.default.readFileSync(filePath, "utf-8");
+        text2 = import_fs3.default.readFileSync(filePath, "utf-8");
       } else {
         return res.status(400).json({ message: "Unsupported file type. Use .docx, .pdf, or .txt" });
       }
@@ -1031,7 +1143,7 @@ async function registerRoutes(server2, app2) {
     } catch (err) {
       res.status(500).json({ message: "Upload failed", error: err.message });
     } finally {
-      import_fs2.default.unlink(filePath, () => {
+      import_fs3.default.unlink(filePath, () => {
       });
     }
   });
@@ -1053,7 +1165,7 @@ async function registerRoutes(server2, app2) {
     try {
       const { text: text2, voice } = req.body;
       const mp3 = await openai2.audio.speech.create({
-        model: "tts-1",
+        model: "tts-1-hd",
         voice: voice || "nova",
         input: text2,
         speed: 0.9
@@ -1260,11 +1372,11 @@ Prayer Focus: ${lesson.prayerFocus}
         text2 = result.value;
       } else if (fileName.endsWith(".pdf")) {
         const pdfParse = (await import("pdf-parse")).default;
-        const dataBuffer = import_fs2.default.readFileSync(filePath);
+        const dataBuffer = import_fs3.default.readFileSync(filePath);
         const pdfData = await pdfParse(dataBuffer);
         text2 = pdfData.text;
       } else if (fileName.endsWith(".txt")) {
-        text2 = import_fs2.default.readFileSync(filePath, "utf-8");
+        text2 = import_fs3.default.readFileSync(filePath, "utf-8");
       } else {
         return res.status(400).json({ message: "Unsupported file type. Use .docx, .pdf, or .txt" });
       }
@@ -1286,7 +1398,7 @@ Prayer Focus: ${lesson.prayerFocus}
     } catch (err) {
       res.status(500).json({ message: "Upload failed", error: err.message });
     } finally {
-      import_fs2.default.unlink(filePath, () => {
+      import_fs3.default.unlink(filePath, () => {
       });
     }
   });
@@ -1343,7 +1455,7 @@ async function processSermon(sermonId, text2) {
       scenes[i].imageUrl = null;
     }
     if (i < scenes.length - 1) {
-      await new Promise((r) => setTimeout(r, 2e3));
+      await new Promise((r) => setTimeout(r, 1e4));
     }
   }
   await updateSermon({ scenes });
@@ -1621,7 +1733,7 @@ async function generateImage(prompt, sermonId, sceneIndex) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.min(5e3 * Math.pow(2, attempt - 1), 3e4);
+        const delay = Math.min(1e4 * Math.pow(2, attempt - 1), 6e4);
         console.log(`Retry ${attempt}/${maxRetries} for ${label}, waiting ${delay / 1e3}s...`);
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -1650,11 +1762,11 @@ async function generateImage(prompt, sermonId, sceneIndex) {
         throw new Error("Gemini returned no image in response");
       }
       const filename = sermonId && sceneIndex !== void 0 ? `${sermonId}-scene${sceneIndex}.png` : `image-${Date.now()}.png`;
-      const filePath = import_path2.default.join(IMAGES_DIR2, filename);
       const buffer = Buffer.from(imagePart.inlineData.data, "base64");
-      import_fs2.default.writeFileSync(filePath, buffer);
-      console.log(`Image saved: ${filePath} (${(buffer.length / 1024).toFixed(0)}KB)`);
-      return `/generated/images/${filename}`;
+      const { saveImage: saveImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
+      const imageUrl = await saveImage2(filename, buffer);
+      console.log(`Image saved: ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      return imageUrl;
     } catch (err) {
       lastError = err;
       if (err.status === 429) {
@@ -2184,16 +2296,16 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
 
 // server/static.ts
 var import_express2 = __toESM(require("express"), 1);
-var import_fs3 = __toESM(require("fs"), 1);
-var import_path3 = __toESM(require("path"), 1);
+var import_fs4 = __toESM(require("fs"), 1);
+var import_path4 = __toESM(require("path"), 1);
 function serveStatic(app2) {
-  const distPath = import_path3.default.resolve(__dirname, "public");
-  if (!import_fs3.default.existsSync(distPath)) {
+  const distPath = import_path4.default.resolve(__dirname, "public");
+  if (!import_fs4.default.existsSync(distPath)) {
     throw new Error(`Could not find the build directory: ${distPath}`);
   }
   app2.use(import_express2.default.static(distPath));
   app2.use("/{*path}", (_req, res) => {
-    res.sendFile(import_path3.default.resolve(distPath, "index.html"));
+    res.sendFile(import_path4.default.resolve(distPath, "index.html"));
   });
 }
 

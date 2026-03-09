@@ -72,16 +72,12 @@ export function registerSMJRoutes(app: Express) {
         .where(eq(smjLessons.id, req.params.id));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
 
+      const { deleteImage } = await import("./image-storage");
       const scenes = (lesson.bibleStoryScenes as any[]) || [];
       for (const scene of scenes) {
         if (scene.imageUrl) {
-          const imgPath = path.resolve(
-            "generated",
-            scene.imageUrl.replace(/^\/generated\//, "")
-          );
-          if (fs.existsSync(imgPath)) {
-            fs.unlinkSync(imgPath);
-          }
+          const fname = scene.imageUrl.split("/").pop();
+          if (fname) await deleteImage(fname);
         }
       }
 
@@ -356,7 +352,7 @@ async function generateSMJImage(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
+        const delay = Math.min(10000 * Math.pow(2, attempt - 1), 60000);
         console.log(`Retry ${attempt}/${maxRetries} for ${label}, waiting ${delay / 1000}s...`);
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -389,12 +385,12 @@ async function generateSMJImage(
       }
 
       const filename = `smj-${lessonId}-scene${sceneIndex}.png`;
-      const filePath = path.join(IMAGES_DIR, filename);
       const buffer = Buffer.from(imagePart.inlineData.data, "base64");
-      fs.writeFileSync(filePath, buffer);
-      console.log(`SMJ image saved: ${filePath} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      const { saveImage } = await import("./image-storage");
+      const imageUrl = await saveImage(filename, buffer);
+      console.log(`SMJ image saved: ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
 
-      return `/generated/images/${filename}`;
+      return imageUrl;
     } catch (err: any) {
       lastError = err;
       if (err.status === 429 || err.message?.includes("safety")) {
@@ -638,7 +634,7 @@ Return JSON:
         scenes[i].imageUrl = imageUrl;
 
         if (i < scenes.length - 1) {
-          await new Promise((r) => setTimeout(r, 2000));
+          await new Promise((r) => setTimeout(r, 10000));
         }
       } catch (err: any) {
         console.error(`Failed to generate SMJ image for scene ${i}:`, err.message);

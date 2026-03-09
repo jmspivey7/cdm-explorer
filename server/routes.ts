@@ -35,6 +35,8 @@ const IMAGES_DIR = path.resolve("generated", "images");
 fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
 export async function registerRoutes(server: Server, app: Express) {
+  const { serveImage } = await import("./image-storage");
+  app.get("/generated/images/:filename", serveImage);
   app.use("/generated", express.static(path.resolve("generated")));
 
   const { registerSMJRoutes } = await import("./smj-routes");
@@ -75,12 +77,22 @@ export async function registerRoutes(server: Server, app: Express) {
 
       await db.delete(sermons).where(eq(sermons.id, sermonId));
 
+      const { deleteImage } = await import("./image-storage");
       const imagesDir = path.resolve("generated", "images");
       if (fs.existsSync(imagesDir)) {
         const files = fs.readdirSync(imagesDir);
         for (const file of files) {
           if (file.startsWith(sermonId)) {
-            fs.unlinkSync(path.join(imagesDir, file));
+            await deleteImage(file);
+          }
+        }
+      }
+      const scenesList = sermon.scenes as any[];
+      if (scenesList) {
+        for (const scene of scenesList) {
+          if (scene.imageUrl) {
+            const fname = scene.imageUrl.split("/").pop();
+            if (fname) await deleteImage(fname);
           }
         }
       }
@@ -513,7 +525,7 @@ async function processSermon(sermonId: string, text: string) {
       scenes[i].imageUrl = null;
     }
     if (i < scenes.length - 1) {
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 10000));
     }
   }
   await updateSermon({ scenes });
@@ -803,7 +815,7 @@ async function generateImage(prompt: string, sermonId?: string, sceneIndex?: num
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
+        const delay = Math.min(10000 * Math.pow(2, attempt - 1), 60000);
         console.log(`Retry ${attempt}/${maxRetries} for ${label}, waiting ${delay / 1000}s...`);
         await new Promise(r => setTimeout(r, delay));
       }
@@ -841,12 +853,12 @@ async function generateImage(prompt: string, sermonId?: string, sceneIndex?: num
         ? `${sermonId}-scene${sceneIndex}.png`
         : `image-${Date.now()}.png`;
 
-      const filePath = path.join(IMAGES_DIR, filename);
       const buffer = Buffer.from(imagePart.inlineData.data, "base64");
-      fs.writeFileSync(filePath, buffer);
-      console.log(`Image saved: ${filePath} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      const { saveImage } = await import("./image-storage");
+      const imageUrl = await saveImage(filename, buffer);
+      console.log(`Image saved: ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
 
-      return `/generated/images/${filename}`;
+      return imageUrl;
     } catch (err: any) {
       lastError = err;
       if (err.status === 429) {
