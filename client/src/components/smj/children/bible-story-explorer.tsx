@@ -37,6 +37,7 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
   const [isMuted, setIsMuted] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const { data: lesson, isLoading } = useQuery<LessonDetail>({
     queryKey: ["/api/smj/lessons", lessonId],
@@ -52,6 +53,7 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
 
   useEffect(() => {
     return () => {
+      abortRef.current?.abort();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -60,6 +62,8 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
   }, []);
 
   const stopAudio = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -71,14 +75,20 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
     stopAudio();
     if (isMuted) return;
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       setIsPlayingAudio(true);
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voice: "nova" }),
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       const blob = await res.blob();
+      if (controller.signal.aborted) return;
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;
@@ -88,8 +98,10 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
       };
       audio.onerror = () => setIsPlayingAudio(false);
       audio.play().catch(() => setIsPlayingAudio(false));
-    } catch {
-      setIsPlayingAudio(false);
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        setIsPlayingAudio(false);
+      }
     }
   }, [isMuted, stopAudio]);
 
