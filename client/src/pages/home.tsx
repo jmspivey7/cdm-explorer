@@ -92,7 +92,7 @@ export default function Home() {
               <span className="font-accent text-xl">Show Me Jesus, Brought to Life</span>
             </p>
             <p className="text-gray-500 text-sm mx-auto">
-              Interactive Bible curriculum that brings the story of Jesus to life for young learners.
+              Interactive Bible curriculum that brings the story of Jesus to life for young learners and family.
             </p>
           </motion.button>
         </div>
