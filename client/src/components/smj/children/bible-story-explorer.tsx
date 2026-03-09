@@ -102,6 +102,13 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
     }
   }, [totalScenes, stopAudio]);
 
+  useEffect(() => {
+    if (scene?.narrative && !isMuted) {
+      const timer = setTimeout(() => playTTS(scene.narrative), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [currentScene, scene?.narrative]);
+
   const toggleMute = () => {
     setIsMuted((m) => {
       const newMuted = !m;
@@ -244,15 +251,6 @@ export default function BibleStoryExplorer({ childName, lessonId, onBack }: Prop
               </p>
             </div>
 
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => playTTS(scene.narrative)}
-              disabled={isPlayingAudio}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-display font-bold text-white bg-se-green hover:bg-se-green/90 transition-all disabled:opacity-50"
-            >
-              <Volume2 className="w-5 h-5" />
-              {isPlayingAudio ? "Playing..." : "Read to Me"}
-            </motion.button>
           </motion.div>
         </AnimatePresence>
       </div>
