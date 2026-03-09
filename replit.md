@@ -8,7 +8,7 @@ A full-stack application with three modules: **Sermon Explorer** transforms serm
 - **Backend**: Express.js (Node.js) + TypeScript
 - **Database**: PostgreSQL via Drizzle ORM + `pg` (node-postgres driver)
 - **Combined server**: Express serves both the API and the Vite dev middleware on port 5000
-- **AI**: OpenAI GPT-4o for content generation + TTS for narration, Gemini 3 Pro Image (native) for illustrations
+- **AI**: OpenAI models (o3 for reasoning/scene generation, gpt-4.1 for creative writing, gpt-4.1-mini for extraction/utility tasks) + TTS for narration, Gemini 3 Pro Image (native) for illustrations
 
 ## Project Structure
 
@@ -70,7 +70,7 @@ Upload progress is kept in an in-memory Map (transient processing state only).
 
 ### Sermon Explorer
 - Upload sermons as .docx, .pdf, or .txt files
-- AI pipeline: analyze → scene breakdown → age-adaptive narratives → Gemini native illustrations → quizzes → discussion prompts
+- AI pipeline: analyze → extract outline → scene breakdown (o3) → age-adaptive narratives (gpt-4.1) → refine image prompts from narratives → Gemini native illustrations → quizzes → discussion prompts
 - Scene images displayed with Ken Burns CSS effects (zoom-in, zoom-out, pan-left, pan-right, fade)
 - Colorful cinematic 3D animated style — no realistic rendering
 - Never depicts God, Jesus, or the Holy Spirit — uses symbolic light/warmth instead
@@ -141,6 +141,22 @@ The teacher view (`worship-teacher.tsx`) renders lesson plans in a two-column la
 - Three fallback tiers: (1) element-based sections (new format), (2) legacy 6-section format, (3) flat legacy fields
 - AI extraction prompt understands modular worship-element structure — each element has its own section page in the curriculum
 - The `WORSHIP_ELEMENTS` constant in `curriculum-data.ts` defines 11 elements with icons, colors, child-friendly explanations, hand motions, and core/non-core flags
+
+## AI Model Strategy
+
+- **o3** (reasoning): Scene generation / story breakdown — needs to analyze sermon structure, avoid duplicates, map to outline. No temperature parameter (reasoning models handle this internally).
+- **gpt-4.1** (creative): Narrative writing, Bible story extraction, worship stories, parent guides — tasks requiring warm, creative, instruction-following output.
+- **gpt-4.1-mini** (utility): Sermon analysis, outline extraction, image prompt refinement, quiz generation, discussion prompts, curriculum extraction, teacher aids — focused extraction/generation tasks.
+- **tts-1-hd** (audio): Text-to-speech narration, voice `nova`, speed 0.9.
+
+### Sermon Pipeline Steps
+1. Analyze sermon metadata (gpt-4.1-mini)
+2. Extract sermon outline/structure (gpt-4.1-mini)
+3. Generate 6-8 scenes following outline (o3)
+4. Write age-adaptive narratives per scene (gpt-4.1)
+5. Refine image prompts from narrative text (gpt-4.1-mini)
+6. Generate illustrations via Gemini
+7. Generate quizzes and discussion prompts (gpt-4.1-mini)
 
 ## Image Generation (Gemini Native)
 

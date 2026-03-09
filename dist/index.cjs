@@ -344,7 +344,7 @@ function registerSMJRoutes(app2) {
       if (!question || !answer)
         return res.status(400).json({ error: "question and answer required" });
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
@@ -379,7 +379,7 @@ Give a child-friendly hint to help remember this answer.`
       const versesText = lesson.bibleVerses?.map((v) => `${v.reference}: ${v.text}`).join("\n") || "No verses available";
       const discussionText = lesson.discussionQuestions?.map((q) => `Q: ${q.question} (Expected: ${q.expectedAnswer})`).join("\n") || "No discussion questions";
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [
           {
             role: "system",
@@ -462,7 +462,7 @@ Return JSON: { "activities": [{ "title": "...", "description": "...", "materials
         return res.status(400).json({ error: "Invalid requestType" });
       }
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
@@ -551,7 +551,7 @@ async function processSMJLesson(uploadId, rawText) {
     prog.currentStep = "Extracting lesson metadata...";
     await db.update(smjLessons).set({ progress: 5, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const metaResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -595,7 +595,7 @@ Return JSON:
     prog.currentStep = "Extracting Bible story...";
     await db.update(smjLessons).set({ progress: 15, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const storyResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       messages: [
         {
           role: "system",
@@ -624,7 +624,7 @@ Return JSON:
     prog.currentStep = "Extracting structured content...";
     await db.update(smjLessons).set({ progress: 28, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const structuredResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -674,11 +674,11 @@ The references from metadata are: ${(metadata.bibleVerseReferences || []).join("
     prog.currentStep = "Breaking story into scenes...";
     await db.update(smjLessons).set({ progress: 40, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const scenesResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "o3",
       messages: [
         {
           role: "system",
-          content: `You break a Bible story narrative into illustrated scenes for preschool children. Each scene should be a distinct moment in the story that can be illustrated. Return valid JSON only.`
+          content: `You break a Bible story narrative into illustrated scenes for preschool children. Each scene should be a distinct moment in the story that can be illustrated. Every scene must cover distinct content \u2014 no two scenes should depict the same moment or teach the same point. Return valid JSON only.`
         },
         {
           role: "user",
@@ -754,7 +754,7 @@ Return JSON:
     prog.currentStep = "Generating quiz questions...";
     await db.update(smjLessons).set({ progress: 75, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const quizResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -796,7 +796,7 @@ Return JSON:
     prog.currentStep = "Generating story sequence...";
     await db.update(smjLessons).set({ progress: 88, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
     const seqResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -1426,7 +1426,7 @@ async function processSermon(sermonId, text2) {
   const updateSermon = async (data) => {
     await db.update(sermons).set(data).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
   };
-  await updateSermon({ currentStep: "Analyzing sermon structure...", progress: 10 });
+  await updateSermon({ currentStep: "Analyzing sermon structure...", progress: 8 });
   const analysis = await analyzeSermon(text2);
   await updateSermon({
     title: analysis.title,
@@ -1434,19 +1434,33 @@ async function processSermon(sermonId, text2) {
     summary: analysis.summary,
     keyThemes: analysis.keyThemes
   });
-  await updateSermon({ currentStep: "Breaking sermon into scenes...", progress: 20 });
-  const scenes = await generateScenes(text2, analysis);
+  await updateSermon({ currentStep: "Extracting sermon outline...", progress: 12 });
+  const outline = await extractSermonOutline(text2);
+  console.log(`Sermon outline extracted: ${outline.sections?.length || 0} sections`);
+  await updateSermon({ currentStep: "Breaking sermon into scenes...", progress: 18 });
+  const scenes = await generateScenes(text2, analysis, outline);
   await updateSermon({ scenes });
-  await updateSermon({ currentStep: "Writing age-appropriate narratives...", progress: 35 });
+  await updateSermon({ currentStep: "Writing age-appropriate narratives...", progress: 30 });
   for (let i = 0; i < scenes.length; i++) {
-    await updateSermon({ currentStep: `Writing narratives for scene ${i + 1}/${scenes.length}...`, progress: Math.round(35 + i / scenes.length * 15) });
+    await updateSermon({ currentStep: `Writing narratives for scene ${i + 1}/${scenes.length}...`, progress: Math.round(30 + i / scenes.length * 12) });
     const narratives = await generateNarratives(scenes[i], i, scenes.length);
     scenes[i].narratives = narratives;
   }
   await updateSermon({ scenes });
-  await updateSermon({ currentStep: "Generating illustrations...", progress: 50 });
+  await updateSermon({ currentStep: "Refining illustration prompts...", progress: 42 });
   for (let i = 0; i < scenes.length; i++) {
-    await updateSermon({ currentStep: `Illustrating scene ${i + 1}/${scenes.length}...`, progress: Math.round(50 + i / scenes.length * 25) });
+    await updateSermon({ currentStep: `Refining illustration ${i + 1}/${scenes.length}...`, progress: Math.round(42 + i / scenes.length * 6) });
+    const narrativeText = scenes[i].narratives?.young || scenes[i].content;
+    try {
+      scenes[i].imagePrompt = await refineImagePrompt(narrativeText, scenes[i].imagePrompt);
+    } catch (err) {
+      console.error(`Image prompt refinement failed for scene ${i}, using original:`, err);
+    }
+  }
+  await updateSermon({ scenes });
+  await updateSermon({ currentStep: "Generating illustrations...", progress: 48 });
+  for (let i = 0; i < scenes.length; i++) {
+    await updateSermon({ currentStep: `Illustrating scene ${i + 1}/${scenes.length}...`, progress: Math.round(48 + i / scenes.length * 30) });
     try {
       const imageUrl = await generateImage(scenes[i].imagePrompt, sermonId, i);
       scenes[i].imageUrl = imageUrl;
@@ -1459,7 +1473,7 @@ async function processSermon(sermonId, text2) {
     }
   }
   await updateSermon({ scenes });
-  await updateSermon({ currentStep: "Creating quizzes and discussion prompts...", progress: 80 });
+  await updateSermon({ currentStep: "Creating quizzes and discussion prompts...", progress: 82 });
   for (let i = 0; i < scenes.length; i++) {
     const narrativeText = scenes[i].narratives ? `Young version: ${scenes[i].narratives.young}
 
@@ -1478,9 +1492,81 @@ Family version: ${scenes[i].narratives.family}` : scenes[i].content;
     status: "ready"
   });
 }
+async function extractSermonOutline(text2) {
+  const response = await openai2.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You are a sermon structure analyst. Identify the major sections/headings of this sermon in the order they appear. Look for explicit headers, Roman numerals, numbered points, or clear topic transitions the pastor made. Capture the pastor's own organizational structure.
+
+Respond with JSON:
+{
+  "sections": [
+    {
+      "heading": "The section heading or topic as the pastor framed it",
+      "summary": "1-2 sentence summary of what this section covers",
+      "approximatePosition": "beginning/early-middle/middle/late-middle/end"
+    }
+  ]
+}
+
+Include the introduction and conclusion as sections. Capture 4-8 sections total \u2014 enough to represent the sermon's full arc without being overly granular.`
+      },
+      { role: "user", content: text2.substring(0, 1e4) }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.2
+  });
+  return JSON.parse(response.choices[0].message.content || '{"sections":[]}');
+}
+async function refineImagePrompt(narrativeText, originalPrompt) {
+  const response = await openai2.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You refine image prompts for a children's storybook so the illustration closely matches the narrative text the reader will see.
+
+You will receive:
+1. The narrative text that will be displayed/read to the child
+2. The original image prompt
+
+Your job: Write a NEW image prompt that illustrates the SPECIFIC scene, characters, actions, and setting described in the narrative. The image should feel like a natural illustration FOR that exact page of the storybook.
+
+KEEP these from the original prompt:
+- Art style (colorful cinematic 3D animated, big-eyed characters, warm lighting, widescreen 16:9)
+- All safety rules (no text, no depiction of God/Jesus as figures \u2014 use golden light rays instead, no alcohol/drugs/weapons/violence)
+
+CHANGE:
+- The scene description should match what the narrative actually describes \u2014 the specific characters, setting, action, and emotional moment
+- If the narrative mentions a specific setting (a path, a garden, a room), the image prompt should describe that setting
+- If the narrative mentions specific characters doing specific things, the image prompt should describe those characters and actions
+
+End every prompt with: "No text, no words, no letters, no writing of any kind. No depiction of God or Jesus as a figure. No alcohol, drugs, gambling, weapons, violence, or scary imagery. Suitable for ages 4-12."
+
+Respond with JSON: { "imagePrompt": "..." }`
+      },
+      {
+        role: "user",
+        content: `NARRATIVE TEXT (what the reader will see):
+${narrativeText}
+
+ORIGINAL IMAGE PROMPT:
+${originalPrompt}
+
+Write a refined image prompt that closely illustrates this specific narrative.`
+      }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.4
+  });
+  const result = JSON.parse(response.choices[0].message.content || "{}");
+  return result.imagePrompt || originalPrompt;
+}
 async function analyzeSermon(text2) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1501,13 +1587,20 @@ async function analyzeSermon(text2) {
   });
   return JSON.parse(response.choices[0].message.content || "{}");
 }
-async function generateScenes(text2, analysis) {
+async function generateScenes(text2, analysis, outline) {
+  const sections = Array.isArray(outline?.sections) ? outline.sections : [];
+  const outlineContext = sections.length > 0 ? `
+
+SERMON OUTLINE (from the pastor's own structure \u2014 your scenes MUST follow this progression):
+${sections.map((s, i) => `${i + 1}. ${s.heading}: ${s.summary}`).join("\n")}
+
+Map your scenes to this outline. Each major section should be represented by at least one scene. Do not over-represent any single section at the expense of others.` : "";
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "o3",
     messages: [
       {
         role: "system",
-        content: `You are a creative director turning a sermon into a cohesive illustrated storybook that reads as ONE CONTINUOUS STORY from beginning to end. Break the sermon into 8-10 visual scenes.
+        content: `You are a creative director turning a sermon into a cohesive illustrated storybook that reads as ONE CONTINUOUS STORY from beginning to end. Break the sermon into 6-8 visual scenes.
 
 RULE 1 \u2014 SERMON ORDER (MOST IMPORTANT):
 - Scenes MUST follow the sermon's actual sequence from beginning to end. Scene 1 covers the opening, scene 2 what comes next, and so on through to the conclusion.
@@ -1522,7 +1615,8 @@ RULE 2 \u2014 CONTINUOUS NARRATIVE FLOW:
 RULE 3 \u2014 NO DUPLICATE OR REPETITIVE SCENES:
 - Every scene must cover DISTINCT content from the sermon. No two scenes should teach the same concept, lesson, or idea.
 - If the pastor repeated a theme for emphasis, consolidate it into ONE scene. Do not create separate scenes for variations of the same point.
-- Before finalizing, review all scenes together and merge or replace any that overlap significantly.
+- After generating all scenes, review them as a complete set. If any two scenes cover substantially the same teaching point, merge them into one scene or replace the duplicate with content from a part of the sermon not yet covered.
+- If a sermon outline is provided, map your scenes to it. Each major section of the outline should be represented. Do not over-represent any single section at the expense of others.
 
 RULE 4 \u2014 IMAGE PROMPT RULES:
 
@@ -1587,21 +1681,20 @@ Respond with JSON: { "scenes": [...] }`
         role: "user",
         content: `Sermon title: ${analysis.title}
 Scripture: ${analysis.scripture}
-Themes: ${analysis.keyThemes?.join(", ")}
+Themes: ${analysis.keyThemes?.join(", ")}${outlineContext}
 
 Full sermon text:
 ${text2.substring(0, 12e3)}`
       }
     ],
     response_format: { type: "json_object" },
-    temperature: 0.7,
     max_tokens: 16384
   });
   const raw = response.choices[0].message.content || '{"scenes":[]}';
   if (response.choices[0].finish_reason === "length") {
     console.warn("Scene generation response was truncated, retrying with fewer scenes...");
     const retryResponse = await openai2.chat.completions.create({
-      model: "gpt-4o",
+      model: "o3",
       messages: [
         {
           role: "system",
@@ -1639,7 +1732,6 @@ ${text2.substring(0, 8e3)}`
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
       max_tokens: 16384
     });
     const retryRaw = retryResponse.choices[0].message.content || '{"scenes":[]}';
@@ -1651,7 +1743,7 @@ ${text2.substring(0, 8e3)}`
 }
 async function generateNarratives(scene, sceneIndex = 0, totalScenes = 1) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     messages: [
       {
         role: "system",
@@ -1784,7 +1876,7 @@ async function generateImage(prompt, sermonId, sceneIndex) {
 }
 async function generateQuiz(content, ageGroup) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1844,7 +1936,7 @@ Create 2 questions for each age group (6 total).`
 }
 async function generateDiscussionPrompts(scene) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1892,7 +1984,7 @@ Content: ${scene.content}`
 async function generateWorshipQuiz(lessonContent, difficulty) {
   const difficultyGuide = difficulty === "easy" ? "For ages 4-6: simple yes/no questions" : difficulty === "hard" ? "For ages 9-12: more complex questions requiring deeper thinking" : "For ages 7-9: moderate difficulty with multiple choice";
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1929,7 +2021,7 @@ Create 3-4 questions.`
 }
 async function generateTeacherDiscussionQuestions(lessonContext) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1950,7 +2042,7 @@ Respond with a JSON object: {"questions": [{"question": "...", "followUp": "..."
 }
 async function generateTeacherIllustrations(lessonContext) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1971,7 +2063,7 @@ Respond with a JSON object: {"illustrations": [{"title": "...", "materials": [".
 }
 async function generateTeacherActivities(lessonContext) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -1993,7 +2085,7 @@ Respond with a JSON object: {"activities": [{"title": "...", "type": "...", "dur
 }
 async function generateWorshipStory(element) {
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     messages: [
       {
         role: "system",
@@ -2039,7 +2131,7 @@ async function generateParentGuide(lesson) {
     }
   }
   const response = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     messages: [
       {
         role: "system",
@@ -2088,7 +2180,7 @@ async function processWorshipCurriculum(uploadId, text2) {
   };
   updateUploadProgress("Analyzing document structure...", 10);
   const structureResponse = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
@@ -2124,7 +2216,7 @@ Respond with JSON:
   const structure = JSON.parse(structureResponse.choices[0].message.content || "{}");
   updateUploadProgress("Extracting lesson content...", 30);
   const lessonsResponse = await openai2.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",

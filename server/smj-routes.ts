@@ -160,7 +160,7 @@ export function registerSMJRoutes(app: Express) {
         return res.status(400).json({ error: "question and answer required" });
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
@@ -211,7 +211,7 @@ export function registerSMJRoutes(app: Express) {
         .join("\n") || "No discussion questions";
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [
           {
             role: "system",
@@ -305,7 +305,7 @@ Return JSON: { "activities": [{ "title": "...", "description": "...", "materials
       }
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
@@ -423,7 +423,7 @@ async function processSMJLesson(uploadId: string, rawText: string) {
     await db.update(smjLessons).set({ progress: 5, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const metaResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -475,7 +475,7 @@ Return JSON:
     await db.update(smjLessons).set({ progress: 15, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const storyResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       messages: [
         {
           role: "system",
@@ -508,7 +508,7 @@ Return JSON:
     await db.update(smjLessons).set({ progress: 28, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const structuredResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -566,11 +566,11 @@ The references from metadata are: ${(metadata.bibleVerseReferences || []).join("
     await db.update(smjLessons).set({ progress: 40, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const scenesResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "o3",
       messages: [
         {
           role: "system",
-          content: `You break a Bible story narrative into illustrated scenes for preschool children. Each scene should be a distinct moment in the story that can be illustrated. Return valid JSON only.`,
+          content: `You break a Bible story narrative into illustrated scenes for preschool children. Each scene should be a distinct moment in the story that can be illustrated. Every scene must cover distinct content — no two scenes should depict the same moment or teach the same point. Return valid JSON only.`,
         },
         {
           role: "user",
@@ -660,7 +660,7 @@ Return JSON:
     await db.update(smjLessons).set({ progress: 75, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const quizResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -710,7 +710,7 @@ Return JSON:
     await db.update(smjLessons).set({ progress: 88, currentStep: prog.currentStep }).where(eq(smjLessons.id, lessonId));
 
     const seqResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
