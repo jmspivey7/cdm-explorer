@@ -1,8 +1,36 @@
 {
-  "name": "Sermon Explorer",
-  "short_name": "SermonExplorer",
+  "name": "CDM Explorer",
+  "short_name": "CDM Explorer",
+  "description": "Interactive faith-based learning experiences for families and children",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1B2A4A",
-  "theme_color": "#2AADAD"
+  "background_color": "#ffffff",
+  "theme_color": "#1d88a9",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }
