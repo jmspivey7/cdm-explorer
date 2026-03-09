@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, customType } from "drizzle-orm/pg-core";
 
 export const sermons = pgTable("sermons", {
   id: text("id").primaryKey(),
@@ -141,6 +141,25 @@ export const smjLessons = pgTable("smj_lessons", {
   progress: integer("progress").default(0),
   currentStep: text("current_step").default(""),
   error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+  toDriver(value: Buffer): Buffer {
+    return value;
+  },
+  fromDriver(value: Buffer): Buffer {
+    return value;
+  },
+});
+
+export const storedImages = pgTable("stored_images", {
+  filename: text("filename").primaryKey(),
+  data: bytea("data").notNull(),
+  mimeType: text("mime_type").notNull().default("image/png"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

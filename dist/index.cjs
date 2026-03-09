@@ -34,10 +34,11 @@ var schema_exports = {};
 __export(schema_exports, {
   sermons: () => sermons,
   smjLessons: () => smjLessons,
+  storedImages: () => storedImages,
   worshipLessons: () => worshipLessons,
   worshipUnits: () => worshipUnits
 });
-var import_pg_core, sermons, worshipUnits, smjLessons, worshipLessons;
+var import_pg_core, sermons, worshipUnits, smjLessons, bytea, storedImages, worshipLessons;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -87,6 +88,23 @@ var init_schema = __esm({
       error: (0, import_pg_core.text)("error"),
       createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
+    bytea = (0, import_pg_core.customType)({
+      dataType() {
+        return "bytea";
+      },
+      toDriver(value) {
+        return value;
+      },
+      fromDriver(value) {
+        return value;
+      }
+    });
+    storedImages = (0, import_pg_core.pgTable)("stored_images", {
+      filename: (0, import_pg_core.text)("filename").primaryKey(),
+      data: bytea("data").notNull(),
+      mimeType: (0, import_pg_core.text)("mime_type").notNull().default("image/png"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    });
     worshipLessons = (0, import_pg_core.pgTable)("worship_lessons", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
       unitId: (0, import_pg_core.integer)("unit_id").notNull().references(() => worshipUnits.id, { onDelete: "cascade" }),
@@ -134,42 +152,17 @@ __export(image_storage_exports, {
   saveImage: () => saveImage,
   serveImage: () => serveImage
 });
-async function getObjectStorageClient() {
-  if (objectStorageClient) return objectStorageClient;
-  const now = Date.now();
-  if (now - lastInitAttempt < INIT_RETRY_INTERVAL) return null;
-  lastInitAttempt = now;
-  try {
-    const { Client } = await import("@replit/object-storage");
-    objectStorageClient = new Client();
-    console.log("Object Storage client initialized");
-    return objectStorageClient;
-  } catch (err) {
-    console.warn("Object Storage not available, using local filesystem only:", err.message);
-    return null;
-  }
-}
 async function saveImage(filename, buffer) {
   const localPath = import_path.default.join(IMAGES_DIR, filename);
   import_fs.default.writeFileSync(localPath, buffer);
-  const client = await getObjectStorageClient();
-  if (client) {
-    const key = `images/${filename}`;
-    const maxRetries = 3;
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        await client.uploadFromBytes(key, buffer);
-        console.log(`Image uploaded to Object Storage: ${key} (${(buffer.length / 1024).toFixed(0)}KB)`);
-        break;
-      } catch (err) {
-        console.error(`Object Storage upload attempt ${attempt + 1}/${maxRetries} failed for ${key}: ${err.message}`);
-        if (attempt < maxRetries - 1) {
-          await new Promise((r) => setTimeout(r, 2e3 * (attempt + 1)));
-        } else {
-          console.error(`All Object Storage upload attempts failed for ${key} \u2014 image saved locally only`);
-        }
-      }
-    }
+  try {
+    await db.insert(storedImages).values({ filename, data: buffer, mimeType: "image/png" }).onConflictDoUpdate({
+      target: storedImages.filename,
+      set: { data: buffer, mimeType: "image/png" }
+    });
+    console.log(`Image stored in database: ${filename} (${(buffer.length / 1024).toFixed(0)}KB)`);
+  } catch (err) {
+    console.error(`Failed to store image in database: ${filename}: ${err.message}`);
   }
   return `/generated/images/${filename}`;
 }
@@ -178,15 +171,11 @@ async function deleteImage(filename) {
   if (import_fs.default.existsSync(localPath)) {
     import_fs.default.unlinkSync(localPath);
   }
-  const client = await getObjectStorageClient();
-  if (client) {
-    try {
-      const key = `images/${filename}`;
-      await client.delete(key);
-      console.log(`Deleted from Object Storage: ${key}`);
-    } catch (err) {
-      console.warn(`Failed to delete from Object Storage: ${filename}: ${err.message}`);
-    }
+  try {
+    await db.delete(storedImages).where((0, import_drizzle_orm.eq)(storedImages.filename, filename));
+    console.log(`Deleted image from database: ${filename}`);
+  } catch (err) {
+    console.warn(`Failed to delete image from database: ${filename}: ${err.message}`);
   }
 }
 async function serveImage(req, res) {
@@ -199,35 +188,31 @@ async function serveImage(req, res) {
     res.set("Cache-Control", "public, max-age=86400");
     return res.sendFile(localPath);
   }
-  const client = await getObjectStorageClient();
-  if (client) {
-    try {
-      const key = `images/${filename}`;
-      const result = await client.downloadAsBytes(key);
-      if (result && result.value) {
-        const buffer = Buffer.from(result.value);
-        import_fs.default.writeFileSync(localPath, buffer);
-        res.set("Content-Type", "image/png");
-        res.set("Cache-Control", "public, max-age=86400");
-        return res.send(buffer);
-      }
-    } catch (err) {
-      console.warn(`Image not found in Object Storage: ${filename}`);
+  try {
+    const [row] = await db.select().from(storedImages).where((0, import_drizzle_orm.eq)(storedImages.filename, filename)).limit(1);
+    if (row?.data) {
+      const buffer = Buffer.from(row.data);
+      import_fs.default.writeFileSync(localPath, buffer);
+      res.set("Content-Type", row.mimeType || "image/png");
+      res.set("Cache-Control", "public, max-age=86400");
+      return res.send(buffer);
     }
+  } catch (err) {
+    console.warn(`Failed to fetch image from database: ${filename}: ${err.message}`);
   }
   res.status(404).send("Image not found");
 }
-var import_fs, import_path, IMAGES_DIR, objectStorageClient, lastInitAttempt, INIT_RETRY_INTERVAL;
+var import_fs, import_path, import_drizzle_orm, IMAGES_DIR;
 var init_image_storage = __esm({
   "server/image-storage.ts"() {
     "use strict";
     import_fs = __toESM(require("fs"), 1);
     import_path = __toESM(require("path"), 1);
+    init_db();
+    init_schema();
+    import_drizzle_orm = require("drizzle-orm");
     IMAGES_DIR = import_path.default.resolve("generated", "images");
     import_fs.default.mkdirSync(IMAGES_DIR, { recursive: true });
-    objectStorageClient = null;
-    lastInitAttempt = 0;
-    INIT_RETRY_INTERVAL = 3e4;
   }
 });
 
@@ -258,7 +243,7 @@ function registerSMJRoutes(app2) {
   });
   app2.get("/api/smj/lessons/:id", async (req, res) => {
     try {
-      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, req.params.id));
+      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm2.eq)(smjLessons.id, req.params.id));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
       res.json(lesson);
     } catch (err) {
@@ -267,7 +252,7 @@ function registerSMJRoutes(app2) {
   });
   app2.delete("/api/smj/lessons/:id", async (req, res) => {
     try {
-      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, req.params.id));
+      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm2.eq)(smjLessons.id, req.params.id));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
       const { deleteImage: deleteImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
       const scenes = lesson.bibleStoryScenes || [];
@@ -277,7 +262,7 @@ function registerSMJRoutes(app2) {
           if (fname) await deleteImage2(fname);
         }
       }
-      await db.delete(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, req.params.id));
+      await db.delete(smjLessons).where((0, import_drizzle_orm2.eq)(smjLessons.id, req.params.id));
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -371,7 +356,7 @@ Give a child-friendly hint to help remember this answer.`
       const { lessonId } = req.body;
       if (!lessonId)
         return res.status(400).json({ error: "lessonId required" });
-      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
       const catechismText = lesson.catechismPairs?.map(
         (p) => `${p.questionNumber ? p.questionNumber + ": " : ""}${p.question} \u2014 ${p.answer}`
@@ -432,7 +417,7 @@ Return JSON:
       const { lessonId, requestType } = req.body;
       if (!lessonId || !requestType)
         return res.status(400).json({ error: "lessonId and requestType required" });
-      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+      const [lesson] = await db.select().from(smjLessons).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
       const lessonContext = `Lesson: "${lesson.title}" (Lesson ${lesson.lessonNumber})
 Scripture: ${lesson.scripture}
@@ -549,7 +534,7 @@ async function processSMJLesson(uploadId, rawText) {
     prog.lessonId = lessonId;
     prog.progress = 5;
     prog.currentStep = "Extracting lesson metadata...";
-    await db.update(smjLessons).set({ progress: 5, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 5, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const metaResponse = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -590,10 +575,10 @@ Return JSON:
       goalsForChildren: metadata.goalsForChildren || [],
       progress: 10,
       currentStep: "Metadata extracted"
-    }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     prog.progress = 15;
     prog.currentStep = "Extracting Bible story...";
-    await db.update(smjLessons).set({ progress: 15, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 15, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const storyResponse = await openai.chat.completions.create({
       model: "gpt-4.1",
       messages: [
@@ -622,7 +607,7 @@ Return JSON:
     prog.currentStep = "Bible story extracted";
     prog.progress = 28;
     prog.currentStep = "Extracting structured content...";
-    await db.update(smjLessons).set({ progress: 28, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 28, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const structuredResponse = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -669,10 +654,10 @@ The references from metadata are: ${(metadata.bibleVerseReferences || []).join("
       closingPrayer: structured.closingPrayer || "",
       progress: 35,
       currentStep: "Structured content extracted"
-    }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     prog.progress = 40;
     prog.currentStep = "Breaking story into scenes...";
-    await db.update(smjLessons).set({ progress: 40, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 40, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const scenesResponse = await openai.chat.completions.create({
       model: "o3",
       messages: [
@@ -723,12 +708,12 @@ Return JSON:
     prog.currentStep = "Story broken into scenes";
     prog.progress = 52;
     prog.currentStep = "Generating illustrations...";
-    await db.update(smjLessons).set({ progress: 52, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 52, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     for (let i = 0; i < scenes.length; i++) {
       try {
         prog.currentStep = `Generating illustration ${i + 1} of ${scenes.length}...`;
         prog.progress = 52 + Math.round(i / scenes.length * 18);
-        await db.update(smjLessons).set({ progress: prog.progress, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+        await db.update(smjLessons).set({ progress: prog.progress, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
         const imageUrl = await generateSMJImage(
           scenes[i].imagePrompt,
           lessonId,
@@ -749,10 +734,10 @@ Return JSON:
       bibleStoryScenes: scenes,
       progress: 70,
       currentStep: "Illustrations generated"
-    }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     prog.progress = 75;
     prog.currentStep = "Generating quiz questions...";
-    await db.update(smjLessons).set({ progress: 75, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 75, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const quizResponse = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -791,10 +776,10 @@ Return JSON:
       preGeneratedQuiz: quizData.questions || [],
       progress: 85,
       currentStep: "Quiz questions generated"
-    }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     prog.progress = 88;
     prog.currentStep = "Generating story sequence...";
-    await db.update(smjLessons).set({ progress: 88, currentStep: prog.currentStep }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    await db.update(smjLessons).set({ progress: 88, currentStep: prog.currentStep }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     const seqResponse = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -829,7 +814,7 @@ Return JSON:
       status: "ready",
       progress: 100,
       currentStep: "Complete"
-    }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+    }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     prog.progress = 100;
     prog.currentStep = "Complete";
     prog.status = "ready";
@@ -843,12 +828,12 @@ Return JSON:
         status: "error",
         error: err.message || "Processing failed",
         currentStep: "Error"
-      }).where((0, import_drizzle_orm.eq)(smjLessons.id, lessonId));
+      }).where((0, import_drizzle_orm2.eq)(smjLessons.id, lessonId));
     } catch {
     }
   }
 }
-var import_multer, import_fs2, import_path2, import_openai, import_drizzle_orm, openai, upload, smjUploadProgress, IMAGES_DIR2;
+var import_multer, import_fs2, import_path2, import_openai, import_drizzle_orm2, openai, upload, smjUploadProgress, IMAGES_DIR2;
 var init_smj_routes = __esm({
   "server/smj-routes.ts"() {
     "use strict";
@@ -858,7 +843,7 @@ var init_smj_routes = __esm({
     import_openai = __toESM(require("openai"), 1);
     init_db();
     init_schema();
-    import_drizzle_orm = require("drizzle-orm");
+    import_drizzle_orm2 = require("drizzle-orm");
     openai = new Proxy({}, {
       get(_target, prop) {
         return getOpenAI()[prop];
@@ -1021,7 +1006,7 @@ var WORSHIP_ELEMENTS = [
 // server/routes.ts
 init_db();
 init_schema();
-var import_drizzle_orm2 = require("drizzle-orm");
+var import_drizzle_orm3 = require("drizzle-orm");
 function getOpenAI2() {
   return new import_openai2.default({ apiKey: process.env.OPENAI_API_KEY });
 }
@@ -1058,7 +1043,7 @@ async function registerRoutes(server2, app2) {
   });
   app2.get("/api/sermons/:id", async (req, res) => {
     try {
-      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, req.params.id));
+      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, req.params.id));
       if (!sermon) return res.status(404).json({ message: "Sermon not found" });
       res.json(sermon);
     } catch (err) {
@@ -1068,9 +1053,9 @@ async function registerRoutes(server2, app2) {
   app2.delete("/api/sermons/:id", async (req, res) => {
     try {
       const sermonId = req.params.id;
-      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
       if (!sermon) return res.status(404).json({ message: "Sermon not found" });
-      await db.delete(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+      await db.delete(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
       const { deleteImage: deleteImage2 } = await Promise.resolve().then(() => (init_image_storage(), image_storage_exports));
       const imagesDir = import_path3.default.resolve("generated", "images");
       if (import_fs3.default.existsSync(imagesDir)) {
@@ -1098,7 +1083,7 @@ async function registerRoutes(server2, app2) {
   });
   app2.get("/api/sermons/:id/scenes/:sceneIndex", async (req, res) => {
     try {
-      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, req.params.id));
+      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, req.params.id));
       if (!sermon) return res.status(404).json({ message: "Sermon not found" });
       const scene = sermon.scenes?.[parseInt(req.params.sceneIndex)];
       if (!scene) return res.status(404).json({ message: "Scene not found" });
@@ -1138,7 +1123,7 @@ async function registerRoutes(server2, app2) {
       res.json({ sermonId, status: "processing", message: "Sermon uploaded. Processing started." });
       processSermon(sermonId, text2).catch(async (err) => {
         console.error("Pipeline error:", err);
-        await db.update(sermons).set({ status: "error", error: err.message }).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+        await db.update(sermons).set({ status: "error", error: err.message }).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
       });
     } catch (err) {
       res.status(500).json({ message: "Upload failed", error: err.message });
@@ -1149,7 +1134,7 @@ async function registerRoutes(server2, app2) {
   });
   app2.get("/api/sermons/:id/status", async (req, res) => {
     try {
-      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, req.params.id));
+      const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, req.params.id));
       if (!sermon) return res.status(404).json({ message: "Sermon not found" });
       res.json({
         status: sermon.status,
@@ -1182,12 +1167,12 @@ async function registerRoutes(server2, app2) {
       const { prompt, sceneIndex, sermonId } = req.body;
       const imageUrl = await generateImage(prompt, sermonId, sceneIndex);
       if (sermonId && sceneIndex !== void 0) {
-        const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+        const [sermon] = await db.select().from(sermons).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
         if (sermon) {
           const scenes = sermon.scenes || [];
           if (scenes[sceneIndex]) {
             scenes[sceneIndex].imageUrl = imageUrl;
-            await db.update(sermons).set({ scenes }).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+            await db.update(sermons).set({ scenes }).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
           }
         }
       }
@@ -1213,7 +1198,7 @@ async function registerRoutes(server2, app2) {
       const units = await db.select().from(worshipUnits);
       const result = [];
       for (const unit of units) {
-        const lessons = await db.select().from(worshipLessons).where((0, import_drizzle_orm2.eq)(worshipLessons.unitId, unit.id));
+        const lessons = await db.select().from(worshipLessons).where((0, import_drizzle_orm3.eq)(worshipLessons.unitId, unit.id));
         result.push({
           id: unit.id,
           number: unit.number,
@@ -1231,9 +1216,9 @@ async function registerRoutes(server2, app2) {
   app2.get("/api/worship/units/:id", async (req, res) => {
     try {
       const unitId = parseInt(req.params.id);
-      const [unit] = await db.select().from(worshipUnits).where((0, import_drizzle_orm2.eq)(worshipUnits.id, unitId));
+      const [unit] = await db.select().from(worshipUnits).where((0, import_drizzle_orm3.eq)(worshipUnits.id, unitId));
       if (!unit) return res.status(404).json({ message: "Unit not found. Upload curriculum to get started." });
-      const lessons = await db.select().from(worshipLessons).where((0, import_drizzle_orm2.eq)(worshipLessons.unitId, unitId));
+      const lessons = await db.select().from(worshipLessons).where((0, import_drizzle_orm3.eq)(worshipLessons.unitId, unitId));
       res.json({
         ...unit,
         lessons: lessons.map((l) => ({
@@ -1265,7 +1250,7 @@ async function registerRoutes(server2, app2) {
   app2.get("/api/worship/lessons/:id", async (req, res) => {
     try {
       const lessonId = parseInt(req.params.id);
-      const [lesson] = await db.select().from(worshipLessons).where((0, import_drizzle_orm2.eq)(worshipLessons.id, lessonId));
+      const [lesson] = await db.select().from(worshipLessons).where((0, import_drizzle_orm3.eq)(worshipLessons.id, lessonId));
       if (!lesson) return res.status(404).json({ message: "Lesson not found" });
       res.json(lesson);
     } catch (err) {
@@ -1273,7 +1258,7 @@ async function registerRoutes(server2, app2) {
     }
   });
   async function findLesson(lessonId) {
-    const [lesson] = await db.select().from(worshipLessons).where((0, import_drizzle_orm2.eq)(worshipLessons.id, lessonId));
+    const [lesson] = await db.select().from(worshipLessons).where((0, import_drizzle_orm3.eq)(worshipLessons.id, lessonId));
     return lesson || null;
   }
   app2.post("/api/worship/ai/generate-quiz", async (req, res) => {
@@ -1412,9 +1397,9 @@ Prayer Focus: ${lesson.prayerFocus}
   app2.delete("/api/worship/units/:id", async (req, res) => {
     try {
       const unitId = parseInt(req.params.id);
-      const [unit] = await db.select().from(worshipUnits).where((0, import_drizzle_orm2.eq)(worshipUnits.id, unitId));
+      const [unit] = await db.select().from(worshipUnits).where((0, import_drizzle_orm3.eq)(worshipUnits.id, unitId));
       if (!unit) return res.status(404).json({ message: "Unit not found" });
-      await db.delete(worshipUnits).where((0, import_drizzle_orm2.eq)(worshipUnits.id, unitId));
+      await db.delete(worshipUnits).where((0, import_drizzle_orm3.eq)(worshipUnits.id, unitId));
       console.log(`Worship unit deleted: ${unitId}`);
       res.json({ message: "Unit deleted" });
     } catch (err) {
@@ -1424,7 +1409,7 @@ Prayer Focus: ${lesson.prayerFocus}
 }
 async function processSermon(sermonId, text2) {
   const updateSermon = async (data) => {
-    await db.update(sermons).set(data).where((0, import_drizzle_orm2.eq)(sermons.id, sermonId));
+    await db.update(sermons).set(data).where((0, import_drizzle_orm3.eq)(sermons.id, sermonId));
   };
   await updateSermon({ currentStep: "Analyzing sermon structure...", progress: 8 });
   const analysis = await analyzeSermon(text2);
@@ -2347,7 +2332,7 @@ ${lesson.activities?.length > 0 ? `Activities: ${lesson.activities.join(", ")}` 
     }
   }
   updateUploadProgress("Organizing curriculum...", 90);
-  const [{ maxNum }] = await db.select({ maxNum: import_drizzle_orm2.sql`coalesce(max(${worshipUnits.number}), 0)` }).from(worshipUnits);
+  const [{ maxNum }] = await db.select({ maxNum: import_drizzle_orm3.sql`coalesce(max(${worshipUnits.number}), 0)` }).from(worshipUnits);
   const nextNumber = (maxNum || 0) + 1;
   const [insertedUnit] = await db.insert(worshipUnits).values({
     number: nextNumber,

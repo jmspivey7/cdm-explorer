@@ -27,7 +27,7 @@ server/          - Express backend
   index.ts       - Server entry point (port 5000, host 0.0.0.0)
   routes.ts      - API routes, AI processing pipeline, Gemini native image generation
   smj-routes.ts  - SMJ Explorer API routes and processing pipeline
-  image-storage.ts - Image persistence via Replit Object Storage with local cache fallback
+  image-storage.ts - Image persistence via PostgreSQL (stored_images table) with local filesystem cache
   db.ts          - Drizzle ORM database client (Neon serverless pool)
   vite.ts        - Vite dev server middleware integration
   static.ts      - Static file serving for production
@@ -50,8 +50,11 @@ Four tables managed by Drizzle ORM (`shared/schema.ts`):
 - **worship_units**: id (serial PK), number, title, description, worship_element, element_spotlight (text), created_at
 - **worship_lessons**: id (serial PK), unit_id (FK → worship_units.id, cascade delete), number, title, main_idea, memory_verse, memory_verse_reference, worship_sign, call_and_response (jsonb), activities (jsonb), prayer_focus, song_suggestions (jsonb), pre_generated_quiz (jsonb), lesson_sections (jsonb), sidebar_meta (jsonb), preparation (text), bible_background (text), element_sections (jsonb), element_sidebar_meta (jsonb)
 - **smj_lessons**: id (text PK), lesson_number, title, scripture, bible_truth, lesson_focus, goals_for_children (jsonb), bible_story_scenes (jsonb — array of {sceneNumber, title, narrative, imageUrl, imagePrompt}), welcome_story (text), catechism_pairs (jsonb — array of {question, answer, questionNumber?}), discussion_questions (jsonb — array of {question, expectedAnswer}), bible_verses (jsonb — array of {reference, text}), closing_prayer (text), pre_generated_quiz (jsonb — array of {question, options, correctIndex, explanation}), story_sequence_events (jsonb — array of {order, event}), status, progress, current_step, error, created_at
+- **stored_images**: filename (text PK), data (bytea — raw image binary), mime_type (text, default "image/png"), created_at
 
 Upload progress is kept in an in-memory Map (transient processing state only).
+
+**Image storage strategy**: Images are stored as binary data in the `stored_images` PostgreSQL table for persistence across deployments. Local filesystem (`generated/images/`) serves as a fast cache layer — images are served from local cache first, falling back to database retrieval (which also re-populates the cache). Object Storage was removed due to persistent initialization failures in deployment environments.
 
 ## Running
 
